@@ -11,7 +11,6 @@ import csvParser from "csv-parser";
 const router = express.Router();
 const uploadDir = path.resolve("uploads");
 
-// Multer setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -23,7 +22,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Upload-chunk endpoint to handle file chunk upload
 router.post("/upload-chunk", upload.single("chunk"), async (req, res) => {
   const { index, totalChunks } = req.body;
   const chunk = req.file;
@@ -49,7 +47,6 @@ router.post("/upload-chunk", upload.single("chunk"), async (req, res) => {
   }
 });
 
-// Process-file endpoint to handle the processing of the uploaded Excel file
 router.post("/process-file", async (req, res) => {
   const { type, mapping } = req.body;
   const filePath = path.join(uploadDir, "combinedFile.xlsx");
@@ -77,16 +74,16 @@ router.post("/process-file", async (req, res) => {
         mappedData.push(newRow);
         rowCount++;
 
-        // Batch işlemi: 5000 satırda bir veritabanına yaz
-        if (mappedData.length >= 5000) {
-          readStream.pause(); // Akışı duraklat
-          await saveBatch(mappedData.splice(0, 5000), type); // Batch kaydet
-          readStream.resume(); // Akışı devam ettir
+        // Batch işlemi: 10000 satırda bir veritabanına yaz
+        if (mappedData.length >= 10000) {
+          readStream.pause();
+          await saveBatch(mappedData.splice(0, 10000), type);
+          readStream.resume();
         }
       })
       .on("end", async () => {
         if (mappedData.length > 0) {
-          await saveBatch(mappedData, type); // Kalan verileri kaydet
+          await saveBatch(mappedData, type);
         }
         res
           .status(200)
