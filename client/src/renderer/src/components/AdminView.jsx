@@ -3,6 +3,11 @@ import * as XLSX from 'xlsx';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 
+//Yapılacaklar listesi
+// CSV dosyasından veriler sabit atılacak parçalara bölünerek 5k + 5k olarak atılacak
+// Büyük excel tablo sorunu ele alınacak
+// UI iyileştirilecek
+
 const AdminView = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [excelHeaders, setExcelHeaders] = useState([]);
@@ -150,80 +155,82 @@ const AdminView = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <h1 className="text-4xl font-bold text-gray-800 mb-6">Admin Panel</h1>
-      <p className="text-lg text-gray-600 mb-8">
-        Veri seti eklemek için lütfen bir Excel dosyası seçin ve dönüştürün.
-      </p>
+      <div className="w-full max-w-2xl p-8 bg-white shadow-lg rounded-lg">
+        <h1 className="text-4xl font-bold text-gray-800 mb-4">Admin Panel</h1>
+        <p className="text-lg text-gray-600 mb-6">
+          Veri seti eklemek için lütfen bir Excel dosyası seçin ve dönüştürün.
+        </p>
 
-      <input
-        type="file"
-        onChange={handleFileChange}
-        accept=".xlsx, .xls"
-        className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
-      />
+        <input
+          type="file"
+          onChange={handleFileChange}
+          accept=".xlsx, .xls"
+          className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none mb-4"
+        />
 
-      <div className="mt-6">
-        <label className="text-gray-700 mb-2">Yükleme Türü Seçin:</label>
-        <div className="flex space-x-4">
-          <button
-            onClick={() => setUploadType('ihracat')}
-            className={`py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 ${
-              uploadType === 'ihracat' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
-            }`}
-            disabled={isLoading}
-          >
-            İhracat
-          </button>
-          <button
-            onClick={() => setUploadType('ithalat')}
-            className={`py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 ${
-              uploadType === 'ithalat' ? 'bg-green-600 text-white' : 'bg-green-500 text-white'
-            }`}
-            disabled={isLoading}
-          >
-            İthalat
-          </button>
-        </div>
-      </div>
-
-      {excelHeaders.length > 0 && dbHeaders.length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold text-gray-700">Başlık Eşleştirme</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {dbHeaders.map((dbHeader, index) => (
-              <div key={index} className="flex flex-col">
-                <label className="text-gray-700">{dbHeader}</label>
-                <select
-                  className="border border-gray-300 rounded p-2 mt-1"
-                  value={mapping[dbHeader] || ''}
-                  onChange={(e) => handleMappingChange(e.target.value, dbHeader)}
-                >
-                  <option value="">--Eşleştirin--</option>
-                  {excelHeaders.map((excelHeader, idx) => (
-                    <option key={idx} value={excelHeader}>
-                      {excelHeader}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+        <div className="mb-6">
+          <label className="text-gray-700 mb-2">Yükleme Türü Seçin:</label>
+          <div className="flex space-x-4 mt-2">
+            <button
+              onClick={() => setUploadType('ihracat')}
+              className={`py-3 px-6 rounded-lg shadow-md transition-all transform hover:scale-105 ${
+                uploadType === 'ihracat' ? 'bg-blue-700 text-white' : 'bg-blue-500 text-white'
+              }`}
+              disabled={isLoading}
+            >
+              İhracat
+            </button>
+            <button
+              onClick={() => setUploadType('ithalat')}
+              className={`py-3 px-6 rounded-lg shadow-md transition-all transform hover:scale-105 ${
+                uploadType === 'ithalat' ? 'bg-green-700 text-white' : 'bg-green-500 text-white'
+              }`}
+              disabled={isLoading}
+            >
+              İthalat
+            </button>
           </div>
         </div>
-      )}
 
-      <button
-        onClick={handleUploadCSV}
-        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 mt-6"
-        disabled={isLoading || Object.keys(mapping).length === 0}
-      >
-        {isLoading ? 'Yükleniyor...' : 'Veritabanına Aktar'}
-      </button>
+        {excelHeaders.length > 0 && dbHeaders.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-4">Başlık Eşleştirme</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {dbHeaders.map((dbHeader, index) => (
+                <div key={index} className="flex flex-col">
+                  <label className="text-gray-700">{dbHeader}</label>
+                  <select
+                    className="border border-gray-300 rounded p-2 mt-1"
+                    value={mapping[dbHeader] || ''}
+                    onChange={(e) => handleMappingChange(e.target.value, dbHeader)}
+                  >
+                    <option value="">--Eşleştirin--</option>
+                    {excelHeaders.map((excelHeader, idx) => (
+                      <option key={idx} value={excelHeader}>
+                        {excelHeader}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-      {message && (
-        <div className="mt-4 text-center text-gray-600">
-          <p className="text-lg">{message}</p>
-        </div>
-      )}
+        <button
+          onClick={handleUploadCSV}
+          className="bg-blue-500 hover:bg-blue-600 text-white py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105 mb-6"
+          disabled={isLoading || Object.keys(mapping).length === 0}
+        >
+          {isLoading ? 'Yükleniyor...' : 'Veritabanına Aktar'}
+        </button>
+
+        {message && (
+          <div className="mt-4 text-center text-gray-600">
+            <p className="text-lg">{message}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

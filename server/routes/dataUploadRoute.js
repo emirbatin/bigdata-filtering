@@ -1,11 +1,12 @@
 import express from "express";
-import fs from "fs/promises"; // fs modülünün asenkron sürümü için
-import { createWriteStream } from "fs"; // fs modülünden createWriteStream fonksiyonunu import et
+import fs from "fs/promises";
+import { createWriteStream, createReadStream } from "fs";
 import path from "path";
-import XLSX from "xlsx";
 import multer from "multer";
 import Ihracat from "../models/ihracatModel.js";
 import Ithalat from "../models/ithalatModel.js";
+import XLSX from "xlsx";
+import csvParser from "csv-parser";
 
 const router = express.Router();
 const uploadDir = path.resolve("uploads");
@@ -27,20 +28,17 @@ router.post("/upload-chunk", upload.single("chunk"), async (req, res) => {
   const { index, totalChunks } = req.body;
   const chunk = req.file;
 
-  // Asenkron dosya yeniden adlandırma işlemi
   const chunkPath = path.join(uploadDir, `chunk_${index}`);
   await fs.rename(chunk.path, chunkPath);
 
-  // Check if all chunks are uploaded
   if (Number(index) === Number(totalChunks) - 1) {
     const filePath = path.join(uploadDir, "combinedFile.xlsx");
-    const writeStream = createWriteStream(filePath); // createWriteStream'i fs'den import ettik
+    const writeStream = createWriteStream(filePath);
 
-    // Combine chunks
     for (let i = 0; i < totalChunks; i++) {
-      const chunkData = await fs.readFile(path.join(uploadDir, `chunk_${i}`)); // Asenkron dosya okuma
+      const chunkData = await fs.readFile(path.join(uploadDir, `chunk_${i}`));
       writeStream.write(chunkData);
-      await fs.unlink(path.join(uploadDir, `chunk_${i}`)); // Asenkron dosya silme
+      await fs.unlink(path.join(uploadDir, `chunk_${i}`));
     }
 
     writeStream.end(() => {
@@ -57,37 +55,61 @@ router.post("/process-file", async (req, res) => {
   const filePath = path.join(uploadDir, "combinedFile.xlsx");
 
   try {
-    const workbook = XLSX.readFile(filePath);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const excelData = XLSX.utils.sheet_to_json(worksheet);
+    // Excel dosyasını CSV'ye dönüştürme ve stream ile okuma
+    const workbook = XLSX.readFile(filePath, { raw: true }); // raw: true daha büyük dosyaları işlemek için belleği optimize eder
+    const csvFilePath = path.join(uploadDir, "convertedFile.csv");
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    // Map Excel data to DB fields based on provided mapping
-    const mappedData = excelData.map((row) => {
-      const newRow = {};
-      Object.entries(mapping).forEach(([dbField, excelHeader]) => {
-        newRow[dbField] = row[excelHeader] || undefined; // Eğer alan yoksa undefined olarak ayarlayın
+    XLSX.writeFile(workbook, csvFilePath, { bookType: "csv" });
+
+    // CSV dosyasını stream ile okuyup işleme
+    const readStream = createReadStream(csvFilePath);
+    const mappedData = [];
+    let rowCount = 0;
+
+    readStream
+      .pipe(csvParser())
+      .on("data", async (row) => {
+        const newRow = {};
+        Object.entries(mapping).forEach(([dbField, excelHeader]) => {
+          newRow[dbField] = row[excelHeader] || undefined;
+        });
+        mappedData.push(newRow);
+        rowCount++;
+
+        // Batch işlemi: 5000 satırda bir veritabanına yaz
+        if (mappedData.length >= 5000) {
+          readStream.pause(); // Akışı duraklat
+          await saveBatch(mappedData.splice(0, 5000), type); // Batch kaydet
+          readStream.resume(); // Akışı devam ettir
+        }
+      })
+      .on("end", async () => {
+        if (mappedData.length > 0) {
+          await saveBatch(mappedData, type); // Kalan verileri kaydet
+        }
+        res
+          .status(200)
+          .json({ message: `Toplam ${rowCount} satır başarıyla kaydedildi.` });
+      })
+      .on("error", (error) => {
+        console.error("CSV okuma hatası:", error);
+        res
+          .status(500)
+          .json({ message: "Veri işlenirken hata oluştu.", error });
       });
-      return newRow;
-    });
-
-    // Batch işlemleri için kodu buraya ekleyin
-    const batchSize = 1000; // Her seferinde 1000 belge ekle
-    for (let i = 0; i < mappedData.length; i += batchSize) {
-      const batch = mappedData.slice(i, i + batchSize);
-      if (type === "ihracat") {
-        await Ihracat.insertMany(batch, { ordered: false });
-      } else if (type === "ithalat") {
-        await Ithalat.insertMany(batch, { ordered: false });
-      }
-    }
-
-    res.status(200).json({ message: "Veriler başarıyla kaydedildi." });
   } catch (error) {
     console.error("Veri işlenirken hata oluştu:", error);
-    res
-      .status(500)
-      .json({ message: "Veri işlenirken hata oluştu.", error: error.errors });
+    res.status(500).json({ message: "Veri işlenirken hata oluştu.", error });
   }
 });
+
+async function saveBatch(data, type) {
+  if (type === "ihracat") {
+    await Ihracat.insertMany(data, { ordered: false });
+  } else if (type === "ithalat") {
+    await Ithalat.insertMany(data, { ordered: false });
+  }
+}
 
 export default router;
