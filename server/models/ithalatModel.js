@@ -31,6 +31,7 @@ const ithalatSchema = new mongoose.Schema(
     istatistikiKiymetUsdDegeri: { type: Number, required: false },
   },
   {
+    strict: false,
     timestamps: true,
   },
   "ithalat"
