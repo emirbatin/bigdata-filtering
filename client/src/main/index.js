@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron')
+const { app, BrowserWindow, Menu, globalShortcut } = require('electron')
 const path = require('path')
 const { electronApp, optimizer, is } = require('@electron-toolkit/utils')
 
@@ -75,6 +75,11 @@ function createWindow() {
   ])
 
   Menu.setApplicationMenu(menu)
+
+  // Kısayol kaydetme
+  globalShortcut.register('CmdOrCtrl+I', () => {
+    mainWindow.webContents.toggleDevTools()
+  })
 }
 
 app.whenReady().then(() => {
@@ -83,6 +88,11 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+// Uygulama kapatılırken kısayolu kaldırma
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {

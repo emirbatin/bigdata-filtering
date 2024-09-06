@@ -3,7 +3,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/database.js";
 import userRoute from "./routes/userRoute.js";
-import uploadRoute from "./routes/uploadRoute.js";
 import dataUploadRoute from "./routes/dataUploadRoute.js";
 import { app, server } from "./socket/socket.js";
 
