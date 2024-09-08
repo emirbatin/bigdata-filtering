@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import ExcelJS from 'exceljs'
-import Fuse from 'fuse.js'
 import { Upload, FileType, ArrowUpCircle, Plus, Trash, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from './alert'
+import { Alert, AlertDescription, AlertTitle } from '../components/Alert'
+import { handleExcelFile, handleCsvFile } from '../services/fileServices'
+import { toCamelCase } from '../utils/stringUtils'
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB
 
@@ -79,50 +79,6 @@ const AdminView = () => {
     'gumruk_ve_ticaret_bolge_mudurlugu'
   ])
 
-  // Kullanıcının girdiği başlığı camelCase formatına dönüştüren fonksiyon
-  const toCamelCase = (str) => {
-    return str.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (match, chr) => chr.toUpperCase())
-  }
-
-  // Türkçe karakterleri İngilizce karşılıklarıyla değiştiren, alt çizgileri kaldıran ve küçük harfe çeviren fonksiyon
-  const normalizeString = (str) => {
-    return str
-      .toLowerCase()
-      .replace(/ğ/g, 'g')
-      .replace(/ü/g, 'u')
-      .replace(/ş/g, 's')
-      .replace(/ı/g, 'i')
-      .replace(/ç/g, 'c')
-      .replace(/ö/g, 'o')
-      .replace(/[^a-zA-Z0-9]/g, '') // Türkçe karakterleri ve özel işaretleri kaldır
-  }
-
-  // Fuzzy matching fonksiyonu, başlıkları normalleştirerek eşleştirir
-  const matchHeader = (excelHeader, dbHeaders) => {
-    const options = {
-      includeScore: true,
-      threshold: 0.3 // Eşleşme hassasiyeti
-    }
-
-    // Excel ve veritabanı başlıklarını normalize ediyoruz
-    const normalizedExcelHeader = normalizeString(excelHeader)
-    const normalizedDbHeaders = dbHeaders.map((header) => ({
-      original: header,
-      normalized: normalizeString(header)
-    }))
-
-    // Fuse.js'i normalize edilmiş verilerle çalıştırıyoruz
-    const fuse = new Fuse(normalizedDbHeaders, { keys: ['normalized'], ...options })
-    const result = fuse.search(normalizedExcelHeader)
-
-    // Eşleşme varsa orijinal başlığı döndürüyoruz
-    if (result.length > 0 && result[0].score < 0.1) {
-      return result[0].item.original
-    } else {
-      return null // Eşleşme yoksa null döndür
-    }
-  }
-
   const handleFileChange = async (event) => {
     const file = event.target.files[0]
     setSelectedFile(file)
@@ -130,109 +86,33 @@ const AdminView = () => {
     setProgress(0)
 
     if (file) {
-      const extension = file.name.split('.').pop().toLowerCase()
-      let fileTypeLocal = ''
+      let result = {}
 
-      if (extension === 'xlsx' || extension === 'xls') {
-        fileTypeLocal = 'xlsx'
-        setFileType('xlsx')
-      } else if (extension === 'csv') {
-        fileTypeLocal = 'csv'
-        setFileType('csv')
-      } else {
-        setMessage('Geçersiz dosya türü seçildi.')
-        setFileType('')
-        return
-      }
+      try {
+        setIsLoading(true)
 
-      setIsLoading(true)
-
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        if (fileTypeLocal === 'xlsx') {
-          try {
-            const buffer = e.target.result
-            const workbook = new ExcelJS.Workbook()
-            await workbook.xlsx.load(buffer)
-            const worksheet = workbook.worksheets[0]
-
-            const headers = []
-            worksheet.getRow(1).eachCell((cell, colNumber) => {
-              headers.push(cell.text)
-            })
-
-            const rows = []
-            worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-              if (rowNumber > 1) {
-                const rowData = {}
-                row.eachCell((cell, colNumber) => {
-                  rowData[headers[colNumber - 1]] = cell.text
-                })
-                rows.push(rowData)
-              }
-            })
-
-            if (rows.length > 0) {
-              setExcelHeaders(headers)
-              setCsvRows(rows)
-
-              // Başlıkları otomatik eşleştirme
-              const initialMapping = {}
-              headers.forEach((header) => {
-                const matchedHeader = matchHeader(header, dbHeaders)
-                if (matchedHeader) {
-                  initialMapping[matchedHeader] = header
-                }
-              })
-              setMapping(initialMapping)
-            } else {
-              setMessage('Dosya boş veya okunamıyor.')
-              setExcelHeaders([])
-              setCsvRows([])
-            }
-          } catch (error) {
-            console.error(error)
-            setMessage('Dosya okuma hatası: ' + error.message)
-          } finally {
-            setIsLoading(false)
-          }
-        } else if (fileTypeLocal === 'csv') {
-          const text = e.target.result
-          const rows = text.split('\n').map((row) => row.split(','))
-          const headers = rows[0]
-          const csvData = rows.slice(1).map((row) =>
-            headers.reduce((acc, header, index) => {
-              acc[header] = row[index]
-              return acc
-            }, {})
-          )
-
-          setExcelHeaders(headers)
-          setCsvRows(csvData)
-
-          const initialMapping = {}
-          headers.forEach((header) => {
-            const matchedHeader = matchHeader(header, dbHeaders)
-            if (matchedHeader) {
-              initialMapping[matchedHeader] = header
-            }
-          })
-          setMapping(initialMapping)
-
-          setIsLoading(false)
+        if (fileType === 'xlsx') {
+          result = await handleExcelFile(file, dbHeaders)
+        } else if (fileType === 'csv') {
+          result = await handleCsvFile(file, dbHeaders)
         }
-      }
 
-      if (fileTypeLocal === 'xlsx') {
-        reader.readAsArrayBuffer(file)
-      } else if (fileTypeLocal === 'csv') {
-        reader.readAsText(file)
+        // İşlenen sonuçları state'e yerleştiriyoruz
+        setExcelHeaders(result.headers)
+        setCsvRows(result.rows || result.csvData)
+        setMapping(result.initialMapping)
+
+        setIsLoading(false)
+      } catch (error) {
+        setMessage('Dosya işleme hatası: ' + error.message)
+        setIsLoading(false)
       }
     } else {
       setMessage('Lütfen dosya seçin.')
     }
   }
 
+  // Başlıklar arasında eşleştirme işlemini değiştirme
   const handleMappingChange = (excelHeader, dbField) => {
     setMapping((prevMapping) => ({
       ...prevMapping,
@@ -242,15 +122,8 @@ const AdminView = () => {
 
   const handleDbHeaderChange = (value, index) => {
     const newDbHeaders = [...dbHeaders]
-    const camelCaseHeader = toCamelCase(value)
-    const matchedHeader = matchHeader(camelCaseHeader, dbHeaders)
-
-    if (matchedHeader) {
-      newDbHeaders[index] = matchedHeader
-    } else {
-      newDbHeaders[index] = camelCaseHeader
-    }
-
+    const camelCaseHeader = toCamelCase(value) // Yeni camelCase formatına çeviriyoruz
+    newDbHeaders[index] = camelCaseHeader
     setDbHeaders(newDbHeaders)
   }
 

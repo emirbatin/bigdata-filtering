@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import FilterForm from './components/FilterForm';
-import LoginView from './components/LoginView';
+import LoginView from './views/LoginView';
 import { BrowserRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
-import AdminView from './components/AdminView';
-import RegisterView from './components/RegisterView';
+import AdminView from './views/AdminView';
+import RegisterView from './views/RegisterView';
 
 const App = () => {
   
