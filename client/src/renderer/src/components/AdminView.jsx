@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import ExcelJS from 'exceljs'
+import Fuse from 'fuse.js'
 import { Upload, FileType, ArrowUpCircle, Plus, Trash, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from './alert'
 
@@ -14,43 +15,112 @@ const AdminView = () => {
   const [mapping, setMapping] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [progress, setProgress] = useState(0) // İlerleme durumunu izlemek için yeni state
+  const [progress, setProgress] = useState(0) 
 
   const [dbHeaders, setDbHeaders] = useState([
-    'tcgbGumrukIdaresiKodu',
-    'tcgbGumrukIdaresiAdi',
-    'tcgbTescilNo',
-    'tcgbTescilTarihi',
-    'tcgbKapanisTarihi',
-    'gondericiAliciVergiNo',
-    'gondericiAliciAdi',
-    'gonderenAdi',
-    'cikisUlkesiKodu',
-    'cikisUlkesiAdi',
-    'menseUlkeKodu',
-    'menseUlkeAdi',
-    'teslimSekliKodu',
-    'kalemSiraNo',
-    'kalemRejimKodu',
-    'kalemRejimAciklamasi',
-    'gtipKodu',
-    'gtipAciklamasi',
-    'ticariTanimi31',
-    'faturaTutari',
-    'faturaTutariDovizTuruKodu',
-    'faturaTutariDovizTuru',
-    'olcuEsyaMiktari',
-    'olcuBirimiAciklamasi',
-    'netAgirlikKg',
-    'hesaplanmisKalemKiymetiUsdDegeri',
-    'istatistikiKiymetUsdDegeri'
-  ]) // Dinamik başlıklar
+    'birinci_alt_rejim_aciklamasi',
+    'ticari_tanimi_31',
+    'alici_adi',
+    'alici_kimlik_no',
+    'belge_no',
+    'fatura_tutari',
+    'gtip_aciklamasi',
+    'gtip_kodu',
+    'gonderen_adi',
+    'gonderici_alici_adi',
+    'gonderici_alici_vergi_no',
+    'gonderici_kimlik_no',
+    'gumruk_istatistik_tarihi_bordro_tarihi',
+    'hesaplanmis_kalem_kiymeti_usd_degeri',
+    'kalem_rejim_kodu',
+    'kalem_sira_no',
+    'kap_adedi',
+    'mense_ulke_kodu',
+    'navlun_tutari_tl_degeri',
+    'net_agirlik',
+    'sigorta_tutari',
+    'sinirdaki_aracin_tasima_sekli_kodu',
+    'tcgb_kapanis_tarihi',
+    'tcgb_tescil_no',
+    'teslim_sekli_kodu',
+    'ticaret_yapilan_ulke_kodu',
+    'varis_ulkesi_adi',
+    'yukleme_bosaltma_yapilan_gumruk_idaresi_kodu',
+    'cikis_ulkesi_kodu',
+    'ulke_kodu',
+    'ulke_tanim',
+    'istatistiki_birim_kodu',
+    'beyan_sahibi_adi_unvani',
+    'beyan_sahibi_kimlik_no',
+    'brut_agirlik',
+    'doviz_turu_aciklamasi',
+    'fatura_doviz_kodu',
+    'gtip_tanimi',
+    'gidecegi_ulke_17_kodu',
+    'gumruk_idaresi_kodu',
+    'havale_hatti',
+    'hesaplanmis_istatistiki_kiymet',
+    'kullanici_birim_kiymeti_usd_degeri',
+    'muayene_hatti',
+    'rejim_kodu',
+    'satisa_esas_miktar',
+    'satisa_esas_miktar_olcu_birimi_kodu',
+    'tcgb_bolge_mudurlugu_kodu',
+    'tcgb_statu_aciklamasi',
+    'tcgb_basmudurluk_kodu',
+    'ticari_odeme_sekli_tanim',
+    'toplam_kap_adedi',
+    'cikistaki_aracin_kayitli_oldugu_ulke_kodu',
+    'olcu_birimi_aciklamasi',
+    'olcu_esya_miktari',
+    'istatistiki_kiymet',
+    'istatistiki_kiymet_usd_degeri',
+    'istatistiki_miktar',
+    'gumruk_ve_ticaret_bolge_mudurlugu'
+  ])
 
   // Kullanıcının girdiği başlığı camelCase formatına dönüştüren fonksiyon
   const toCamelCase = (str) => {
+    return str.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (match, chr) => chr.toUpperCase())
+  }
+
+  // Türkçe karakterleri İngilizce karşılıklarıyla değiştiren, alt çizgileri kaldıran ve küçük harfe çeviren fonksiyon
+  const normalizeString = (str) => {
     return str
-      .toLowerCase() // Tüm karakterleri küçük harfe çevir
-      .replace(/[^a-zA-Z0-9]+(.)/g, (match, chr) => chr.toUpperCase()) // Boşluklardan sonra gelen harfi büyük yap
+      .toLowerCase()
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ı/g, 'i')
+      .replace(/ç/g, 'c')
+      .replace(/ö/g, 'o')
+      .replace(/[^a-zA-Z0-9]/g, '') // Türkçe karakterleri ve özel işaretleri kaldır
+  }
+
+  // Fuzzy matching fonksiyonu, başlıkları normalleştirerek eşleştirir
+  const matchHeader = (excelHeader, dbHeaders) => {
+    const options = {
+      includeScore: true,
+      threshold: 0.3 // Eşleşme hassasiyeti
+    }
+
+    // Excel ve veritabanı başlıklarını normalize ediyoruz
+    const normalizedExcelHeader = normalizeString(excelHeader)
+    const normalizedDbHeaders = dbHeaders.map((header) => ({
+      original: header,
+      normalized: normalizeString(header)
+    }))
+
+    // Fuse.js'i normalize edilmiş verilerle çalıştırıyoruz
+    const fuse = new Fuse(normalizedDbHeaders, { keys: ['normalized'], ...options })
+    const result = fuse.search(normalizedExcelHeader)
+
+    // Eşleşme varsa orijinal başlığı döndürüyoruz
+    if (result.length > 0 && result[0].score < 0.1) {
+      return result[0].item.original
+    } else {
+      return null // Eşleşme yoksa null döndür
+    }
   }
 
   const handleFileChange = async (event) => {
@@ -105,6 +175,16 @@ const AdminView = () => {
             if (rows.length > 0) {
               setExcelHeaders(headers)
               setCsvRows(rows)
+
+              // Başlıkları otomatik eşleştirme
+              const initialMapping = {}
+              headers.forEach((header) => {
+                const matchedHeader = matchHeader(header, dbHeaders)
+                if (matchedHeader) {
+                  initialMapping[matchedHeader] = header
+                }
+              })
+              setMapping(initialMapping)
             } else {
               setMessage('Dosya boş veya okunamıyor.')
               setExcelHeaders([])
@@ -129,6 +209,16 @@ const AdminView = () => {
 
           setExcelHeaders(headers)
           setCsvRows(csvData)
+
+          const initialMapping = {}
+          headers.forEach((header) => {
+            const matchedHeader = matchHeader(header, dbHeaders)
+            if (matchedHeader) {
+              initialMapping[matchedHeader] = header
+            }
+          })
+          setMapping(initialMapping)
+
           setIsLoading(false)
         }
       }
@@ -150,15 +240,22 @@ const AdminView = () => {
     }))
   }
 
-  // Kullanıcının girdiği başlıkları camelCase formatına çevirme
   const handleDbHeaderChange = (value, index) => {
     const newDbHeaders = [...dbHeaders]
-    newDbHeaders[index] = toCamelCase(value) // Girdiği değeri camelCase'e çeviriyoruz
+    const camelCaseHeader = toCamelCase(value)
+    const matchedHeader = matchHeader(camelCaseHeader, dbHeaders)
+
+    if (matchedHeader) {
+      newDbHeaders[index] = matchedHeader
+    } else {
+      newDbHeaders[index] = camelCaseHeader
+    }
+
     setDbHeaders(newDbHeaders)
   }
 
   const handleAddDbHeader = () => {
-    setDbHeaders([...dbHeaders, '']) // Yeni boş başlık eklerken henüz dönüştürmüyoruz
+    setDbHeaders([...dbHeaders, '']) // Yeni boş başlık ekle
   }
 
   const handleRemoveDbHeader = (index) => {
@@ -179,7 +276,7 @@ const AdminView = () => {
 
     const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE)
     setIsLoading(true)
-    setProgress(0) // İlerlemeyi sıfırla
+    setProgress(0)
 
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE
@@ -202,7 +299,6 @@ const AdminView = () => {
           throw new Error('Parça yükleme hatası')
         }
 
-        // İlerlemeyi güncelle
         setProgress(((i + 1) / totalChunks) * 100)
       } catch (error) {
         console.error(error)
@@ -214,7 +310,7 @@ const AdminView = () => {
 
     setMessage('Dosya başarıyla yüklendi')
     setIsLoading(false)
-    setProgress(100) // Yükleme tamamlandı
+    setProgress(100)
 
     try {
       const response = await fetch('http://localhost:3000/api/v1/data/process-file', {
@@ -357,7 +453,7 @@ const AdminView = () => {
                         <option value="">--Eşleştirme--</option>
                         {excelHeaders.map((excelHeader, idx) => (
                           <option key={idx} value={excelHeader}>
-                            {excelHeader}
+                            {excelHeader} (Önerilen: {mapping[dbHeader]})
                           </option>
                         ))}
                       </select>
