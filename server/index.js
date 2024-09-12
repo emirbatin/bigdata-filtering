@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/database.js";
 import userRoute from "./routes/userRoute.js";
 import dataUploadRoute from "./routes/dataUploadRoute.js";
+import commerceRoute from "./routes/commerceRoute.js";
 import { app, server } from "./socket/socket.js";
 
 dotenv.config();
@@ -25,6 +26,7 @@ app.use(cors(corsOptions)); // CORS middleware
 // Diğer middleware'ler ve rotalar
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/data", dataUploadRoute);
+app.use("/api/v1/commerce", commerceRoute);
 
 server.listen(PORT, () => {
   connectDB();

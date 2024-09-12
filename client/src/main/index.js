@@ -78,7 +78,9 @@ function createWindow() {
 
   // Kısayol kaydetme
   globalShortcut.register('CmdOrCtrl+I', () => {
-    mainWindow.webContents.toggleDevTools()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.toggleDevTools()
+    }
   })
 }
 

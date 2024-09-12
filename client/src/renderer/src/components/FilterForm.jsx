@@ -1,70 +1,364 @@
-import React, { useEffect, useState } from 'react';
-import CustomButton from './CustomButton';
-import Sidebar from './Sidebar';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { X, ChevronLeft, ChevronRight, Download, Loader2, RefreshCw, Menu } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import Sidebar from './Sidebar'
+
+const CustomButton = React.memo(({ label, onClick, className, icon: Icon, disabled }) => (
+  <motion.button
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    onClick={onClick}
+    disabled={disabled}
+    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none shadow-md ${className}`}
+  >
+    {Icon && <Icon className="mr-2 h-4 w-4" />}
+    {label}
+  </motion.button>
+))
+
+const CustomIconButton = React.memo(
+  ({ onClick, className, icon: Icon, iconSize = 24, disabled }) => (
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none shadow-md ${className}`}
+    >
+      {Icon && <Icon size={iconSize} />} {/* Icon size yönetilebilir */}
+    </motion.button>
+  )
+)
 
 const FilterForm = () => {
-  const [permission, setPermission] = useState(null);
-  const navigate = useNavigate();
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(20)
+  const [selectedDataType, setSelectedDataType] = useState('import')
+  const [totalPages, setTotalPages] = useState(1)
+  const [pageGroup, setPageGroup] = useState(0)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [filters, setFilters] = useState({
+    tcgbTescilNo: '',
+    vergiNo: '',
+    gondericiAliciAdi: '',
+    aliciAdi: '',
+    gonderenAdi: '',
+    cikisUlkeKodu: '',
+    cikisUlkeAdi: '',
+    menseUlkeKodu: '',
+    menseUlkeAdi: '',
+    tescilTarihi: '',
+    kapanisTarihi: '',
+    minFaturaTutari: '',
+    maxFaturaTutari: '',
+    gtipKodu: ''
+  })
+
+  const applyFilters = useCallback(async () => {
+    setLoading(true)
+
+    console.log('Uygulanan filtreler:', filters) // Tüm filtreleri logla
+
+    const query = new URLSearchParams({
+      ...filters,
+      page: currentPage,
+      limit: itemsPerPage
+    }).toString()
+
+    console.log('Oluşturulan sorgu stringi:', query) // Oluşturulan sorgu stringini logla
+
+    try {
+      const url = `http://localhost:3000/api/v1/commerce/${selectedDataType}?${query}`
+      console.log("İstek URL'si:", url) // İstek URL'sini logla
+
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log('Backend yanıtı:', result) // Backend yanıtını logla
+
+      setData(result.data)
+      setTotalPages(result.totalPages)
+
+      console.log('Alınan veri sayısı:', result.data.length)
+      console.log('Toplam sayfa sayısı:', result.totalPages)
+      console.log('Mevcut sayfa:', currentPage)
+
+      if (filters.gondericiAliciAdi) {
+        console.log('gondericiAliciAdi filtresi uygulandı:', filters.gondericiAliciAdi)
+        console.log(
+          'Bu filtreyle eşleşen veri sayısı:',
+          result.data.filter(
+            (item) =>
+              item.gonderici_alici_adi &&
+              item.gonderici_alici_adi
+                .toLowerCase()
+                .includes(filters.gondericiAliciAdi.toLowerCase())
+          ).length
+        )
+      }
+    } catch (error) {
+      console.error('Veri çekme hatası:', error)
+      alert(`Veri çekilirken bir hata oluştu: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, currentPage, itemsPerPage, selectedDataType])
 
   useEffect(() => {
-    // Check if user is logged in and fetch user role
-    const token = localStorage.getItem('token');
-    if (token) {
-      const user = JSON.parse(atob(token.split('.')[1])); // Decode JWT token to get user data
-      setPermission(user.permission); // Set the user role
+    applyFilters()
+  }, [applyFilters, currentPage, selectedDataType])
+
+  const handlePageChange = useCallback((pageNumber) => {
+    setCurrentPage(pageNumber)
+  }, [])
+
+  const renderPageNumbers = useMemo(() => {
+    if (totalPages > 0) {
+      const pages = []
+      const startPage = pageGroup * 10 + 1
+      const endPage = Math.min(startPage + 9, totalPages)
+
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(
+          <CustomButton
+            key={i}
+            label={i.toString()}
+            onClick={() => handlePageChange(i)}
+            className={`px-3 py-1 mx-1 rounded ${
+              currentPage === i ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          />
+        )
+      }
+      return pages
     }
-  }, []);
+    return null
+  }, [pageGroup, totalPages, currentPage, handlePageChange])
 
-  const handleFilterClick = () => {
-    console.log('Filter button clicked');
-  };
+  const filterColumns = useMemo(() => {
+    const hiddenColumns = ['id', '_id']
+    return (key) => !hiddenColumns.includes(key)
+  }, [])
 
-  const handleAdminClick = () => {
-    navigate('/Admin');
-  };
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev)
+  }, [])
+
+  const handleDataTypeChange = useCallback((type) => {
+    setSelectedDataType(type)
+    setCurrentPage(1)
+    setPageGroup(0)
+  }, [])
+
+  const handleDownload = useCallback(() => {
+    console.log('Veriler indiriliyor...')
+  }, [])
+
+  const containerVariants = {
+    hidden: { opacity: 0, x: 50 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.5 } }
+  }
+
+  const tableVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.5, delay: 0.2 } }
+  }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar with filter inputs */}
-      <Sidebar />
+    <motion.div
+      className="flex h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <div
+        className={`flex flex-col p-6 flex-grow transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? 'mr-80' : 'mr-0'
+        } relative z-0`}
+      >
+        <motion.div
+          className="flex justify-between items-center mb-6"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h1 className="text-3xl font-bold text-gray-800">İthalat ve İhracat Verileri</h1>
+        </motion.div>
 
-      {/* Main Content */}
-      <div className="flex flex-col p-6 flex-grow ml-64 transition-margin duration-300 ease-in-out">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Filtre Tablosu</h1>
-          <div className="flex space-x-4">
-            <CustomButton 
-              label="Filter" 
-              onClick={handleFilterClick} 
-              className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105" 
-            />
-            <CustomButton 
-              label="Last 100" 
-              onClick={handleFilterClick} 
-              className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105" 
-            />
-            {permission === 'admin' && (
-              <CustomButton 
-                label="Admin Panel" 
-                onClick={handleAdminClick} 
-                className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105" 
-              />
+        <motion.div
+          className="mb-4 flex space-x-2"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <CustomButton
+            label="İthalat Verileri"
+            onClick={() => handleDataTypeChange('import')}
+            className={`py-2 px-4 ${
+              selectedDataType === 'import'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white hover:bg-gray-100 text-gray-800'
+            }`}
+          />
+          <CustomButton
+            label="İhracat Verileri"
+            onClick={() => handleDataTypeChange('export')}
+            className={`py-2 px-4 ${
+              selectedDataType === 'export'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white hover:bg-gray-100 text-gray-800'
+            }`}
+          />
+          <CustomButton
+            label="Verileri İndir"
+            onClick={handleDownload}
+            className="bg-green-500 text-white hover:bg-green-600 py-2 px-4"
+            icon={Download}
+          />
+          <CustomButton
+            label="Yenile"
+            onClick={applyFilters}
+            className="bg-indigo-500 text-white hover:bg-indigo-600 py-2 px-4"
+            icon={RefreshCw}
+          />
+        </motion.div>
+
+        <motion.div
+          className="bg-white rounded-lg shadow-lg p-4 flex-grow flex flex-col relative w-[97vw] overflow-x-auto"
+          variants={tableVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <h2 className="text-2xl mb-4 font-semibold text-gray-700">
+            {selectedDataType === 'import' ? 'İthalat Verileri' : 'İhracat Verileri'}
+          </h2>
+
+          <AnimatePresence>
+            {loading ? (
+              <motion.div
+                className="flex justify-center items-center h-64"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+              </motion.div>
+            ) : (
+              <motion.div
+                className="overflow-x-auto"
+                style={{ maxHeight: 'calc(100vh - 300px)' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <table className="min-w-[800px] divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0 z-10">
+                    <tr>
+                      {data.length > 0 &&
+                        Object.keys(data[0])
+                          .filter(filterColumns)
+                          .map((key) => (
+                            <th
+                              key={key}
+                              className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                            >
+                              {key}
+                            </th>
+                          ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {data.slice(0, 20).map((item, index) => (
+                      <motion.tr
+                        key={index}
+                        className="hover:bg-gray-50"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        {Object.keys(item)
+                          .filter(filterColumns)
+                          .map((key, i) => (
+                            <td
+                              key={i}
+                              className="px-3 py-2 whitespace-normal break-words text-sm text-gray-500"
+                              style={{ maxWidth: '300px' }}
+                            >
+                              {item[key]}
+                            </td>
+                          ))}
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </motion.div>
             )}
-          </div>
-        </div>
+          </AnimatePresence>
+        </motion.div>
 
-        {/* Content Area */}
-        <div className="bg-white rounded-lg shadow-lg p-6 h-full overflow-y-auto">
-          {/* Placeholder for main content */}
-          <div className="text-center text-gray-600">
-            <p className="text-lg">Görüntülenecek veri yok. Aramanızı başlatmak için kenar çubuğundaki filtreleri kullanın.</p>
-          </div>
-        </div>
+        <motion.div
+          className="flex justify-start mt-4 space-x-2"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <CustomButton
+            label="Önceki"
+            onClick={() => pageGroup > 0 && setPageGroup(pageGroup - 1)}
+            className={`px-3 py-1 ${
+              pageGroup > 0
+                ? 'bg-white hover:bg-gray-100 text-gray-800'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+            icon={ChevronLeft}
+            disabled={pageGroup === 0}
+          />
+          {renderPageNumbers}
+          <CustomButton
+            label="Sonraki"
+            onClick={() => pageGroup < Math.floor(totalPages / 10) && setPageGroup(pageGroup + 1)}
+            className={`px-3 py-1 ${
+              pageGroup < Math.floor(totalPages / 10)
+                ? 'bg-white hover:bg-gray-100 text-gray-800'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+            icon={ChevronRight}
+            disabled={pageGroup >= Math.floor(totalPages / 10)}
+          />
+        </motion.div>
       </div>
-    </div>
-  );
-};
 
-export default FilterForm;
+      <Sidebar
+        isOpen={isSidebarOpen}
+        toggleSidebar={toggleSidebar}
+        filters={filters}
+        setFilters={setFilters}
+        applyFilters={applyFilters}
+      />
+      {/* Sağ üst köşedeki menü butonu kaldırıldı */}
+      <motion.div
+        className={`fixed top-4 right-4 z-50 transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? 'mr-80' : 'mr-0'
+        }`}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <CustomIconButton
+          onClick={toggleSidebar}
+          className="w-12 h-12 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
+          icon={isSidebarOpen ? X : Menu}
+          iconSize={24} // Icon boyutunu dışarıdan ayarlıyoruz
+        />
+      </motion.div>
+    </motion.div>
+  )
+}
+
+export default React.memo(FilterForm)
