@@ -17,18 +17,37 @@ app.use(express.json({ limit: "50mb" }));
 
 // CORS ayarları
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:3000"], // İzin verilen originler
-  credentials: true, // Çerezlerin gönderilmesine izin verir
+  origin: ["http://localhost:5173", "http://localhost:3000"],
+  credentials: true,
 };
 
-app.use(cors(corsOptions)); // CORS middleware
+app.use(cors(corsOptions));
 
-// Diğer middleware'ler ve rotalar
+// Loglama middleware'i
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/data", dataUploadRoute);
 app.use("/api/v1/commerce", commerceRoute);
 
-server.listen(PORT, () => {
-  connectDB();
-  console.log(`Server listening at port ${PORT}`);
+// Hata yakalama middleware'i
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    error: "Sunucu hatası",
+    details: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
+
+server.listen(PORT, async () => {
+  try {
+    await connectDB();
+    console.log(`Server listening at port ${PORT}`);
+  } catch (error) {
+    console.error("Failed to connect to database:", error);
+    process.exit(1);
+  }
 });

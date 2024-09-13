@@ -41,12 +41,11 @@ const createFilterQuery = (filters) => {
     if (filters[field]) {
       let dbField = field.replace(/([A-Z])/g, "_$1").toLowerCase();
 
-      // Özel durum: gondericiAliciAdi için
       if (field === "gondericiAliciAdi") {
         dbField = "gonderici_alici_adi";
       }
       if (field === "vergiNo") {
-        dbField = "gonderici_alici_vergi_no"; // Veritabanındaki alan adını burada ayarladık
+        dbField = "gonderici_alici_vergi_no";
       }
 
       query.$and.push({
@@ -60,8 +59,16 @@ const createFilterQuery = (filters) => {
 
   if (filters.tescilTarihi || filters.kapanisTarihi) {
     const dateQuery = {};
-    if (filters.tescilTarihi) dateQuery.$gte = new Date(filters.tescilTarihi);
-    if (filters.kapanisTarihi) dateQuery.$lte = new Date(filters.kapanisTarihi);
+    if (filters.tescilTarihi) {
+      const startDate = new Date(filters.tescilTarihi);
+      startDate.setUTCHours(0, 0, 0, 0);
+      dateQuery.$gte = startDate;
+    }
+    if (filters.kapanisTarihi) {
+      const endDate = new Date(filters.kapanisTarihi);
+      endDate.setUTCHours(23, 59, 59, 999);
+      query.$and.push({ tcgb_kapanis_tarihi: { $lte: endDate } });
+    }
     query.$and.push({ gumruk_istatistik_tarihi_bordro_tarihi: dateQuery });
   }
 
@@ -121,13 +128,15 @@ const getData = async (req, res, Model) => {
     res.json({
       data,
       currentPage: Number(page),
-      totalPages, // Değişiklik burada: totalPages direkt olarak gönderiliyor
+      totalPages,
       total,
     });
   } catch (error) {
+    console.error("Error in getData:", error);
     res.status(500).json({
       error: "Veriler alınırken bir hata oluştu.",
       details: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };
@@ -135,7 +144,6 @@ const getData = async (req, res, Model) => {
 export const getImportData = async (req, res) => getData(req, res, Ithalat);
 export const getExportData = async (req, res) => getData(req, res, Ihracat);
 
-// Sorgu performansını analiz etmek için
 export const analyzeQuery = async (req, res, Model) => {
   try {
     const { ...filters } = req.query;

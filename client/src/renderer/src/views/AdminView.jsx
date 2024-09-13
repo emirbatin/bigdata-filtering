@@ -1,12 +1,26 @@
 import React, { useState } from 'react'
-import { Upload, FileType, ArrowUpCircle, Plus, Trash, AlertCircle } from 'lucide-react'
+import {
+  Upload,
+  FileType,
+  ArrowUpCircle,
+  Plus,
+  Trash,
+  AlertCircle,
+  ArrowLeft,
+  LogOut
+} from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../components/Alert'
 import { handleExcelFile, handleCsvFile } from '../services/fileServices'
 import { toCamelCase } from '../utils/stringUtils'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const AdminView = () => {
+  const navigate = useNavigate()
+  const { isAdmin, logout } = useAuth()
+
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileType, setFileType] = useState('')
   const [excelHeaders, setExcelHeaders] = useState([])
@@ -15,7 +29,7 @@ const AdminView = () => {
   const [mapping, setMapping] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [progress, setProgress] = useState(0) 
+  const [progress, setProgress] = useState(0)
 
   const [dbHeaders, setDbHeaders] = useState([
     'birinci_alt_rejim_aciklamasi',
@@ -112,30 +126,6 @@ const AdminView = () => {
     }
   }
 
-  // Başlıklar arasında eşleştirme işlemini değiştirme
-  const handleMappingChange = (excelHeader, dbField) => {
-    setMapping((prevMapping) => ({
-      ...prevMapping,
-      [dbField]: excelHeader
-    }))
-  }
-
-  const handleDbHeaderChange = (value, index) => {
-    const newDbHeaders = [...dbHeaders]
-    const camelCaseHeader = toCamelCase(value) // Yeni camelCase formatına çeviriyoruz
-    newDbHeaders[index] = camelCaseHeader
-    setDbHeaders(newDbHeaders)
-  }
-
-  const handleAddDbHeader = () => {
-    setDbHeaders([...dbHeaders, '']) // Yeni boş başlık ekle
-  }
-
-  const handleRemoveDbHeader = (index) => {
-    const newDbHeaders = dbHeaders.filter((_, i) => i !== index)
-    setDbHeaders(newDbHeaders)
-  }
-
   const handleUploadCSV = async () => {
     if (!selectedFile) {
       setMessage('Lütfen bir dosya seçin.')
@@ -206,11 +196,72 @@ const AdminView = () => {
     }
   }
 
+  const handleLogout = async () => {
+    await logout()
+  }
+
+  const handleMappingChange = (excelHeader, dbField) => {
+    setMapping((prevMapping) => ({
+      ...prevMapping,
+      [dbField]: excelHeader
+    }))
+  }
+
+  const handleDbHeaderChange = (value, index) => {
+    const newDbHeaders = [...dbHeaders]
+    const camelCaseHeader = toCamelCase(value) // Yeni camelCase formatına çeviriyoruz
+    newDbHeaders[index] = camelCaseHeader
+    setDbHeaders(newDbHeaders)
+  }
+
+  const handleAddDbHeader = () => {
+    setDbHeaders([...dbHeaders, '']) // Yeni boş başlık ekle
+  }
+
+  const handleRemoveDbHeader = (index) => {
+    const newDbHeaders = dbHeaders.filter((_, i) => i !== index)
+    setDbHeaders(newDbHeaders)
+  }
+
+  const handleGoBack = () => {
+    navigate('/FilterForm') // Ana sayfaya yönlendir (FilterForm'un bulunduğu sayfa)
+  }
+
+  // Admin yetkisini kontrol et ve admin değilse yönlendir
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-extrabold text-gray-900">Erişim Engellendi</h1>
+          <p className="mt-4 text-lg text-gray-600">Bu sayfayı görüntüleme yetkiniz yok.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="bg-white shadow-xl rounded-lg overflow-hidden w-full">
         <div className="px-6 py-8 sm:p-10">
-          <h1 className="text-3xl font-extrabold text-gray-900 mb-6">Admin Paneli</h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-extrabold text-gray-900">Admin Paneli</h1>
+            <div className="flex space-x-4">
+              <button
+                onClick={handleGoBack}
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                <ArrowLeft className="mr-2 h-5 w-5" />
+                Geri Dön
+              </button>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <LogOut className="mr-2 h-5 w-5" />
+                Çıkış Yap
+              </button>
+            </div>
+          </div>
 
           <div className="space-y-8">
             {/* Dosya Türü Seçimi */}
@@ -220,9 +271,9 @@ const AdminView = () => {
               </label>
               <div className="mt-1 flex space-x-4">
                 <button
-                  onClick={() => setFileType('excel')}
+                  onClick={() => setFileType('xlsx')}
                   className={`flex-1 inline-flex items-center justify-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                    fileType === 'excel'
+                    fileType === 'xlsx'
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
                   }`}
@@ -262,14 +313,14 @@ const AdminView = () => {
                         type="file"
                         className="sr-only"
                         onChange={handleFileChange}
-                        accept={fileType === 'excel' ? '.xlsx, .xls' : '.csv'}
+                        accept={fileType === 'xlsx' ? '.xlsx' : '.csv'}
                         disabled={isLoading || !fileType}
                       />
                     </label>
                     <p className="pl-1">veya sürükleyip bırakın</p>
                   </div>
                   <p className="text-xs text-gray-500">
-                    {fileType === 'excel' ? 'XLSX veya XLS' : 'CSV'} dosyası (maksimum 10MB)
+                    {fileType === 'xlsx' ? 'XLSX' : 'CSV'} dosyası (maksimum 10MB)
                   </p>
                 </div>
               </div>

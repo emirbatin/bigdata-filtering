@@ -1,44 +1,34 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { X, ChevronLeft, ChevronRight, Download, Loader2, RefreshCw, Menu } from 'lucide-react'
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  RefreshCw,
+  Menu,
+  UserCheck,
+  LogOut
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
-
-const CustomButton = React.memo(({ label, onClick, className, icon: Icon, disabled }) => (
-  <motion.button
-    whileHover={{ scale: 1.05 }}
-    whileTap={{ scale: 0.95 }}
-    onClick={onClick}
-    disabled={disabled}
-    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none shadow-md ${className}`}
-  >
-    {Icon && <Icon className="mr-2 h-4 w-4" />}
-    {label}
-  </motion.button>
-))
-
-const CustomIconButton = React.memo(
-  ({ onClick, className, icon: Icon, iconSize = 24, disabled }) => (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none shadow-md ${className}`}
-    >
-      {Icon && <Icon size={iconSize} />} {/* Icon size yönetilebilir */}
-    </motion.button>
-  )
-)
+import CustomButton from './CustomButton'
+import CustomIconButton from './CustomIconButton'
 
 const FilterForm = () => {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(20)
+  const [itemsPerPage] = useState(30)
   const [selectedDataType, setSelectedDataType] = useState('import')
+  const [selectedRows, setSelectedRows] = useState([]) // Seçilen satırların dizisi
+  const [lastSelectedRow, setLastSelectedRow] = useState(null) // Son tıklanan satır
   const [totalPages, setTotalPages] = useState(1)
   const [pageGroup, setPageGroup] = useState(0)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false) // Değiştirilen kısım
+  const navigate = useNavigate()
   const [filters, setFilters] = useState({
     tcgbTescilNo: '',
     vergiNo: '',
@@ -56,10 +46,106 @@ const FilterForm = () => {
     gtipKodu: ''
   })
 
+  const handleRowClick = (index, event) => {
+    if (event.shiftKey && lastSelectedRow !== null) {
+      const start = Math.min(lastSelectedRow, index)
+      const end = Math.max(lastSelectedRow, index)
+      let newSelectedRows = [...selectedRows]
+
+      // Eğer tıklanan satır zaten seçiliyse, onu listeden çıkar
+      if (newSelectedRows.includes(index)) {
+        newSelectedRows = newSelectedRows.filter((row) => row !== index)
+      } else {
+        // Değilse, aradaki tüm satırları seç
+        for (let i = start; i <= end; i++) {
+          if (!newSelectedRows.includes(i)) {
+            newSelectedRows.push(i)
+          }
+        }
+      }
+
+      setSelectedRows(newSelectedRows)
+    } else {
+      // Shift'e basılı değilse, sadece tıklanan satırı seç ve diğer seçimleri kaldır
+      setSelectedRows([index])
+    }
+    setLastSelectedRow(index)
+  }
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/v1/user/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+      if (response.ok) {
+        console.log('Başarıyla çıkış yaptınız.')
+        navigate('/')
+      } else {
+        console.log('Çıkış işlemi başarısız.')
+      }
+    } catch (error) {
+      console.log('Çıkış işlemi sırasında hata oluştu.')
+    }
+  }
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        console.error('Token bulunamadı, kullanıcı doğrulanamıyor.')
+        return
+      }
+
+      try {
+        const response = await fetch('http://localhost:3000/api/v1/user/me', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Kullanıcı verisi alınamadı')
+        }
+
+        const data = await response.json()
+        setIsAdmin(data.permission === 'admin') // Kullanıcının admin olup olmadığını kontrol ediyoruz
+      } catch (error) {
+        console.error('Kullanıcı verisi alınırken hata oluştu:', error)
+      }
+    }
+
+    fetchUserData()
+  }, [])
+
+  const handleAdminClick = () => {
+    navigate('/Admin')
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const formatCellContent = (key, value) => {
+    if (typeof value === 'string' && value.includes('T00:00:00.000Z')) {
+      return formatDate(value)
+    }
+    return value
+  }
+
   const applyFilters = useCallback(async () => {
     setLoading(true)
 
-    console.log('Uygulanan filtreler:', filters) // Tüm filtreleri logla
+    console.log('Uygulanan filtreler:', filters)
 
     const query = new URLSearchParams({
       ...filters,
@@ -67,11 +153,11 @@ const FilterForm = () => {
       limit: itemsPerPage
     }).toString()
 
-    console.log('Oluşturulan sorgu stringi:', query) // Oluşturulan sorgu stringini logla
+    console.log('Oluşturulan sorgu stringi:', query)
 
     try {
       const url = `http://localhost:3000/api/v1/commerce/${selectedDataType}?${query}`
-      console.log("İstek URL'si:", url) // İstek URL'sini logla
+      console.log("İstek URL'si:", url)
 
       const response = await fetch(url)
 
@@ -80,7 +166,7 @@ const FilterForm = () => {
       }
 
       const result = await response.json()
-      console.log('Backend yanıtı:', result) // Backend yanıtını logla
+      console.log('Backend yanıtı:', result)
 
       setData(result.data)
       setTotalPages(result.totalPages)
@@ -215,12 +301,16 @@ const FilterForm = () => {
                 : 'bg-white hover:bg-gray-100 text-gray-800'
             }`}
           />
+
+          {/* Verileri İndir Butonu Şu Anda Deaktif
           <CustomButton
             label="Verileri İndir"
             onClick={handleDownload}
             className="bg-green-500 text-white hover:bg-green-600 py-2 px-4"
             icon={Download}
           />
+          */}
+          
           <CustomButton
             label="Yenile"
             onClick={applyFilters}
@@ -231,6 +321,7 @@ const FilterForm = () => {
 
         <motion.div
           className="bg-white rounded-lg shadow-lg p-4 flex-grow flex flex-col relative w-[97vw] overflow-x-auto"
+          style={{ userSelect: 'none' }}
           variants={tableVariants}
           initial="hidden"
           animate="visible"
@@ -241,22 +332,11 @@ const FilterForm = () => {
 
           <AnimatePresence>
             {loading ? (
-              <motion.div
-                className="flex justify-center items-center h-64"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+              <motion.div className="flex justify-center items-center h-64">
                 <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
               </motion.div>
             ) : (
-              <motion.div
-                className="overflow-x-auto"
-                style={{ maxHeight: 'calc(100vh - 300px)' }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+              <motion.div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
                 <table className="min-w-[800px] divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
@@ -277,7 +357,10 @@ const FilterForm = () => {
                     {data.slice(0, 20).map((item, index) => (
                       <motion.tr
                         key={index}
-                        className="hover:bg-gray-50"
+                        className={`cursor-pointer ${
+                          selectedRows.includes(index) ? 'bg-blue-100' : 'hover:bg-gray-50'
+                        }`}
+                        onClick={(event) => handleRowClick(index, event)} // Shift + Tıklama işlevi
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
@@ -290,7 +373,7 @@ const FilterForm = () => {
                               className="px-3 py-2 whitespace-normal break-words text-sm text-gray-500"
                               style={{ maxWidth: '300px' }}
                             >
-                              {item[key]}
+                              {formatCellContent(key, item[key])}
                             </td>
                           ))}
                       </motion.tr>
@@ -341,7 +424,6 @@ const FilterForm = () => {
         setFilters={setFilters}
         applyFilters={applyFilters}
       />
-      {/* Sağ üst köşedeki menü butonu kaldırıldı */}
       <motion.div
         className={`fixed top-4 right-4 z-50 transition-all duration-300 ease-in-out ${
           isSidebarOpen ? 'mr-80' : 'mr-0'
@@ -350,12 +432,38 @@ const FilterForm = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <CustomIconButton
-          onClick={toggleSidebar}
-          className="w-12 h-12 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
-          icon={isSidebarOpen ? X : Menu}
-          iconSize={24} // Icon boyutunu dışarıdan ayarlıyoruz
-        />
+        <div className="flex flex-col items-center space-y-4">
+          {/* Menü Butonu */}
+          <CustomIconButton
+            onClick={toggleSidebar}
+            className="w-12 h-12 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
+            icon={isSidebarOpen ? X : Menu}
+            iconSize={24}
+          />
+          {/* Admin Butonu */}
+          {isAdmin ? (
+            <>
+              <CustomIconButton
+                onClick={handleAdminClick}
+                className="w-12 h-12 p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center"
+                icon={UserCheck}
+                data-tooltip-id="admin-tooltip"
+                data-tooltip-content="Admin Paneli"
+              />
+            </>
+          ) : (
+            <>
+              {/* Çıkış Yap Butonu */}
+              <CustomIconButton
+                onClick={handleLogout} // handleLogout fonksiyonu daha önce tanımladığınız logout işlemi için
+                className="w-12 h-12 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center"
+                data-tooltip-id="logout-tooltip"
+                icon={LogOut}
+                data-tooltip-content="Çıkış Yap"
+              />
+            </>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   )

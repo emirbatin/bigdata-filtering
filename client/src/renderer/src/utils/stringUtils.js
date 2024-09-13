@@ -1,5 +1,3 @@
-// src/utils/stringUtils.js
-
 // Türkçe karakterleri İngilizce karşılıklarıyla değiştiren, alt çizgileri kaldıran ve küçük harfe çeviren fonksiyon
 export const normalizeString = (str) => {
   return str
