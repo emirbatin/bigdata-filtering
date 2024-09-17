@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
 import {
   X,
   ChevronLeft,
@@ -9,27 +8,32 @@ import {
   RefreshCw,
   Menu,
   UserCheck,
-  LogOut
+  LogOut,
+  SortAsc,
+  SortDesc,
+  Filter
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import CustomButton from './CustomButton'
 import CustomIconButton from './CustomIconButton'
-import useAuth from '../hooks/useAuth'
-import { apiRequest } from '../utils/apiUtils'
+import { AgGridReact } from 'ag-grid-react'
+import 'ag-grid-community/styles/ag-grid.css'
+import 'ag-grid-community/styles/ag-theme-alpine.css'
 
 const FilterForm = () => {
-  const { isAdmin, isAuthenticated, logout, fetchUserData } = useAuth()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(50)
   const [selectedDataType, setSelectedDataType] = useState('import')
-  const [selectedRows, setSelectedRows] = useState([]) 
+  const [selectedRows, setSelectedRows] = useState([])
   const [lastSelectedRow, setLastSelectedRow] = useState(null)
   const [totalPages, setTotalPages] = useState(1)
   const [pageGroup, setPageGroup] = useState(0)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const navigate = useNavigate()
   const [filters, setFilters] = useState({
     tcgbTescilNo: '',
@@ -48,36 +52,58 @@ const FilterForm = () => {
     gtipKodu: ''
   })
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />
-  }
-
-  const handleRowClick = (index, event) => {
-    if (event.shiftKey && lastSelectedRow !== null) {
-      const start = Math.min(lastSelectedRow, index)
-      const end = Math.max(lastSelectedRow, index)
-      let newSelectedRows = [...selectedRows]
-
-      if (newSelectedRows.includes(index)) {
-        newSelectedRows = newSelectedRows.filter((row) => row !== index)
-      } else {
-        for (let i = start; i <= end; i++) {
-          if (!newSelectedRows.includes(i)) {
-            newSelectedRows.push(i)
-          }
-        }
-      }
-
-      setSelectedRows(newSelectedRows)
-    } else {
-      setSelectedRows([index])
-    }
+  const handleRowClick = (event) => {
+    const index = event.node.rowIndex
+    setSelectedRows([index])
     setLastSelectedRow(index)
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/v1/user/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+      if (response.ok) {
+        console.log('Başarıyla çıkış yaptınız.')
+        navigate('/')
+      } else {
+        console.log('Çıkış işlemi başarısız.')
+      }
+    } catch (error) {
+      console.log('Çıkış işlemi sırasında hata oluştu.')
+    }
   }
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        console.error('Token bulunamadı, kullanıcı doğrulanamıyor.')
+        return
+      }
+
+      try {
+        const response = await fetch('http://localhost:3000/api/v1/user/me', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Kullanıcı verisi alınamadı')
+        }
+
+        const data = await response.json()
+        setIsAdmin(data.permission === 'admin')
+      } catch (error) {
+        console.error('Kullanıcı verisi alınırken hata oluştu:', error)
+      }
+    }
+
+    fetchUserData()
+  }, [])
 
   const handleAdminClick = () => {
     navigate('/Admin')
@@ -95,13 +121,6 @@ const FilterForm = () => {
     })
   }
 
-  const formatCellContent = (key, value) => {
-    if (typeof value === 'string' && value.includes('T00:00:00.000Z')) {
-      return formatDate(value)
-    }
-    return value
-  }
-
   const applyFilters = useCallback(async () => {
     setLoading(true)
 
@@ -112,8 +131,8 @@ const FilterForm = () => {
     }).toString()
 
     try {
-      const url = `/api/v1/commerce/${selectedDataType}?${query}`
-      const response = await apiRequest(url)
+      const url = `http://localhost:3000/api/v1/commerce/${selectedDataType}?${query}`
+      const response = await fetch(url)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -122,36 +141,13 @@ const FilterForm = () => {
       const result = await response.json()
       setData(result.data)
       setTotalPages(result.totalPages)
-
-      console.log('Alınan veri sayısı:', result.data.length)
-      console.log('Toplam sayfa sayısı:', result.totalPages)
-      console.log('Mevcut sayfa:', currentPage)
-
-      if (filters.gondericiAliciAdi) {
-        console.log('gondericiAliciAdi filtresi uygulandı:', filters.gondericiAliciAdi)
-        console.log(
-          'Bu filtreyle eşleşen veri sayısı:',
-          result.data.filter(
-            (item) =>
-              item.gonderici_alici_adi &&
-              item.gonderici_alici_adi
-                .toLowerCase()
-                .includes(filters.gondericiAliciAdi.toLowerCase())
-          ).length
-        )
-      }
     } catch (error) {
-      if (error.message === 'Unauthorized') {
-        alert('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.')
-        logout()
-      } else {
-        console.error('Veri çekme hatası:', error)
-        alert(`Veri çekilirken bir hata oluştu: ${error.message}`)
-      }
+      console.error('Veri çekme hatası:', error)
+      alert(`Veri çekilirken bir hata oluştu: ${error.message}`)
     } finally {
       setLoading(false)
     }
-  }, [filters, currentPage, itemsPerPage, selectedDataType, logout])
+  }, [filters, currentPage, itemsPerPage, selectedDataType])
 
   useEffect(() => {
     applyFilters()
@@ -185,7 +181,7 @@ const FilterForm = () => {
   }, [pageGroup, totalPages, currentPage, handlePageChange])
 
   const filterColumns = useMemo(() => {
-    const hiddenColumns = ['id', '_id']
+    const hiddenColumns = ['id', '_id', '__v', 'createdAt', 'updatedAt']
     return (key) => !hiddenColumns.includes(key)
   }, [])
 
@@ -213,7 +209,15 @@ const FilterForm = () => {
     visible: { opacity: 1, transition: { duration: 0.5, delay: 0.2 } }
   }
 
-  // Return ifadesi buradan sonra gelecek...
+  const columnDefs = Object.keys(data[0] || {})
+    .filter(filterColumns)
+    .map((key) => ({
+      headerName: key,
+      field: key,
+      resizable: true,
+      sortable: true,
+      filter: true
+    }))
 
   return (
     <motion.div
@@ -261,15 +265,6 @@ const FilterForm = () => {
             }`}
           />
 
-          {/* Verileri İndir Butonu Şu Anda Deaktif
-          <CustomButton
-            label="Verileri İndir"
-            onClick={handleDownload}
-            className="bg-green-500 text-white hover:bg-green-600 py-2 px-4"
-            icon={Download}
-          />
-          */}
-          
           <CustomButton
             label="Yenile"
             onClick={applyFilters}
@@ -295,55 +290,27 @@ const FilterForm = () => {
                 <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
               </motion.div>
             ) : (
-              <motion.div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-                <table className="min-w-[800px] divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0 z-10">
-                    <tr>
-                      {data.length > 0 &&
-                        Object.keys(data[0])
-                          .filter(filterColumns)
-                          .map((key) => (
-                            <th
-                              key={key}
-                              className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"
-                            >
-                              {key}
-                            </th>
-                          ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.slice(0, 50).map((item, index) => (
-                      <motion.tr
-                        key={index}
-                        className={`cursor-pointer ${
-                          selectedRows.includes(index) ? 'bg-blue-100' : 'hover:bg-gray-50'
-                        }`}
-                        onClick={(event) => handleRowClick(index, event)} // Shift + Tıklama işlevi
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        {Object.keys(item)
-                          .filter(filterColumns)
-                          .map((key, i) => (
-                            <td
-                              key={i}
-                              className="px-3 py-2 whitespace-normal break-words text-sm text-gray-500"
-                              style={{ maxWidth: '300px' }}
-                            >
-                              {formatCellContent(key, item[key])}
-                            </td>
-                          ))}
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
+              <motion.div className="ag-theme-alpine" style={{ height: '100vh', width: '100%' }}>
+                <AgGridReact
+                  columnDefs={columnDefs}
+                  rowData={data}
+                  defaultColDef={{
+                    resizable: true,
+                    sortable: true,
+                    filter: true
+                  }}
+                  pagination={true}
+                  paginationPageSize={itemsPerPage}
+                  onRowClicked={handleRowClick}
+                  animateRows={true}
+                />
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
 
+        {/*Geçici İleri Geri Butonu*/}
+        {/*
         <motion.div
           className="flex justify-start mt-4 space-x-2"
           initial={{ opacity: 0, y: 20 }}
@@ -374,6 +341,7 @@ const FilterForm = () => {
             disabled={pageGroup >= Math.floor(totalPages / 10)}
           />
         </motion.div>
+      */}
       </div>
 
       <Sidebar
@@ -392,36 +360,24 @@ const FilterForm = () => {
         transition={{ delay: 0.2 }}
       >
         <div className="flex flex-col items-center space-y-4">
-          {/* Menü Butonu */}
           <CustomIconButton
             onClick={toggleSidebar}
             className="w-12 h-12 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
             icon={isSidebarOpen ? X : Menu}
             iconSize={24}
           />
-          {/* Admin Butonu */}
-          {isAdmin ? (
-            <>
-              <CustomIconButton
-                onClick={handleAdminClick}
-                className="w-12 h-12 p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center"
-                icon={UserCheck}
-                data-tooltip-id="admin-tooltip"
-                data-tooltip-content="Admin Paneli"
-              />
-            </>
-          ) : (
-            <>
-              {/* Çıkış Yap Butonu */}
-              <CustomIconButton
-                onClick={handleLogout} // handleLogout fonksiyonu daha önce tanımladığınız logout işlemi için
-                className="w-12 h-12 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center"
-                data-tooltip-id="logout-tooltip"
-                icon={LogOut}
-                data-tooltip-content="Çıkış Yap"
-              />
-            </>
+          {isAdmin && (
+            <CustomIconButton
+              onClick={handleAdminClick}
+              className="w-12 h-12 p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center"
+              icon={UserCheck}
+            />
           )}
+          <CustomIconButton
+            onClick={handleLogout}
+            className="w-12 h-12 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center"
+            icon={LogOut}
+          />
         </div>
       </motion.div>
     </motion.div>
