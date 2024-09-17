@@ -5,6 +5,7 @@ import {
   handleUploadChunk,
   processFile,
 } from "../controllers/uploadController.js";
+import isAuthenticated from "../middleware/isAuthenticated.js";
 
 const router = express.Router();
 const uploadDir = path.resolve("uploads");
@@ -21,9 +22,14 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Chunk yükleme işlemi
-router.post("/upload-chunk", upload.single("chunk"), handleUploadChunk);
+router.post(
+  "/upload-chunk",
+  upload.single("chunk"),
+  isAuthenticated,
+  handleUploadChunk
+);
 
 // Dosya işleme
-router.post("/process-file", processFile);
+router.post("/process-file", isAuthenticated, processFile);
 
 export default router;

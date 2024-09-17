@@ -7,7 +7,12 @@ import {
   Trash,
   AlertCircle,
   ArrowLeft,
-  LogOut
+  LogOut,
+  File,
+  X,
+  FileText,
+  HardDrive,
+  Calendar
 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '../components/Alert'
 import { handleExcelFile, handleCsvFile } from '../services/fileServices'
@@ -21,7 +26,7 @@ const AdminView = () => {
   const navigate = useNavigate()
   const { isAdmin, logout } = useAuth()
 
-  const [selectedFile, setSelectedFile] = useState(null)
+  const [selectedFiles, setSelectedFiles] = useState([])
   const [fileType, setFileType] = useState('')
   const [excelHeaders, setExcelHeaders] = useState([])
   const [csvRows, setCsvRows] = useState([])
@@ -94,106 +99,160 @@ const AdminView = () => {
   ])
 
   const handleFileChange = async (event) => {
-    const file = event.target.files[0]
-    setSelectedFile(file)
+    const files = Array.from(event.target.files)
     setMessage('')
     setProgress(0)
 
-    if (file) {
-      let result = {}
-
-      try {
-        setIsLoading(true)
-
-        if (fileType === 'xlsx') {
-          result = await handleExcelFile(file, dbHeaders)
-        } else if (fileType === 'csv') {
-          result = await handleCsvFile(file, dbHeaders)
+    // Her dosya için ön işleme yapalım
+    const processedFiles = await Promise.all(
+      files.map(async (file) => {
+        try {
+          let result
+          if (fileType === 'xlsx') {
+            result = await handleExcelFile(file, dbHeaders)
+          } else if (fileType === 'csv') {
+            result = await handleCsvFile(file, dbHeaders)
+          }
+          return {
+            file: {
+              name: file.name,
+              size: file.size,
+              lastModified: file.lastModified,
+              type: file.type
+            },
+            ...result
+          }
+        } catch (error) {
+          console.error(`Error processing file ${file.name}:`, error)
+          return {
+            file: {
+              name: file.name,
+              size: file.size,
+              lastModified: file.lastModified,
+              type: file.type
+            },
+            error: error.message
+          }
         }
+      })
+    )
 
-        // İşlenen sonuçları state'e yerleştiriyoruz
-        setExcelHeaders(result.headers)
-        setCsvRows(result.rows || result.csvData)
-        setMapping(result.initialMapping)
+    // Hata olmayan dosyaları filtreleyip state'e kaydedelim
+    const validFiles = processedFiles.filter((file) => !file.error)
+    setSelectedFiles(validFiles)
 
-        setIsLoading(false)
-      } catch (error) {
-        setMessage('Dosya işleme hatası: ' + error.message)
-        setIsLoading(false)
-      }
-    } else {
-      setMessage('Lütfen dosya seçin.')
+    // İlk dosyanın başlıklarını ve eşleştirmelerini set edelim
+    if (validFiles.length > 0) {
+      setExcelHeaders(validFiles[0].headers)
+      setMapping(validFiles[0].initialMapping)
+    }
+
+    // Varsa hataları gösterelim
+    const errors = processedFiles.filter((file) => file.error)
+    if (errors.length > 0) {
+      setMessage(`${errors.length} dosya işlenemedi. Lütfen dosyaları kontrol edin.`)
     }
   }
 
+  const formatFileSize = (bytes) => {
+    if (bytes === undefined || isNaN(bytes)) return 'Bilinmeyen boyut'
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  const formatDate = (date) => {
+    if (!date) return 'Bilinmeyen tarih'
+    return new Date(date).toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   const handleUploadCSV = async () => {
-    if (!selectedFile) {
-      setMessage('Lütfen bir dosya seçin.')
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setMessage('Kullanıcı doğrulanmadı.')
       return
     }
 
-    if (!uploadType) {
-      setMessage('Lütfen bir yükleme türü seçin.')
-      return
-    }
+    // Dosya yükleme mantığı burada devam ediyor...
+    for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex++) {
+      const file = selectedFiles[fileIndex].file
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
 
-    const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE)
-    setIsLoading(true)
-    setProgress(0)
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE
+        const end = start + CHUNK_SIZE
+        const chunk = file.slice(start, end)
 
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE
-      const end = start + CHUNK_SIZE
-      const chunk = selectedFile.slice(start, end)
+        const formData = new FormData()
+        formData.append('chunk', chunk)
+        formData.append('index', i)
+        formData.append('totalChunks', totalChunks)
+        formData.append('fileType', fileType)
+        formData.append('fileName', file.name)
 
-      const formData = new FormData()
-      formData.append('chunk', chunk)
-      formData.append('index', i)
-      formData.append('totalChunks', totalChunks)
-      formData.append('fileType', fileType)
+        try {
+          const response = await fetch('http://localhost:3000/api/v1/data/upload-chunk', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}` // Token burada ekleniyor
+            },
+            body: formData
+          })
 
+          if (!response.ok) {
+            throw new Error('Parça yükleme hatası')
+          }
+
+          setProgress(
+            ((fileIndex * totalChunks + i + 1) / (selectedFiles.length * totalChunks)) * 100
+          )
+        } catch (error) {
+          console.error(error)
+          setMessage(`${file.name} dosyası yüklenirken hata oluştu: ${error.message}`)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // process-file isteği
       try {
-        const response = await fetch('http://localhost:3000/api/v1/data/upload-chunk', {
+        const response = await fetch('http://localhost:3000/api/v1/data/process-file', {
           method: 'POST',
-          body: formData
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}` // Token burada da ekleniyor
+          },
+          body: JSON.stringify({
+            type: uploadType,
+            mapping: selectedFiles[fileIndex].initialMapping,
+            fileType,
+            fileName: file.name
+          })
         })
 
+        const result = await response.json()
         if (!response.ok) {
-          throw new Error('Parça yükleme hatası')
+          throw new Error(result.message || 'Bilinmeyen hata')
         }
-
-        setProgress(((i + 1) / totalChunks) * 100)
       } catch (error) {
         console.error(error)
-        setMessage(`Veri yükleme hatası: ${error.message}`)
+        setMessage(`${file.name} dosyası işlenirken hata oluştu: ${error.message}`)
         setIsLoading(false)
         return
       }
     }
 
-    setMessage('Dosya başarıyla yüklendi')
+    setMessage('Tüm dosyalar başarıyla yüklendi ve işlendi')
     setIsLoading(false)
     setProgress(100)
-
-    try {
-      const response = await fetch('http://localhost:3000/api/v1/data/process-file', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ type: uploadType, mapping, fileType })
-      })
-
-      const result = await response.json()
-      if (response.ok) {
-        setMessage(result.message)
-      } else {
-        setMessage(`Veri işleme hatası: ${result.message || 'Bilinmeyen hata'}`)
-      }
-    } catch (error) {
-      console.error(error)
-      setMessage(`Veri işleme hatası: ${error.message}`)
-    }
   }
 
   const handleLogout = async () => {
@@ -226,6 +285,47 @@ const AdminView = () => {
   const handleGoBack = () => {
     navigate('/FilterForm') // Ana sayfaya yönlendir (FilterForm'un bulunduğu sayfa)
   }
+
+  const FileList = ({ files, onRemove }) => (
+    <div className="mt-6 space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800">Seçilen Dosyalar</h3>
+      <ul className="bg-white rounded-lg shadow-md divide-y divide-gray-200">
+        {files.map((fileObj, index) => {
+          const file = fileObj.file || fileObj // file özelliği yoksa doğrudan fileObj'yi kullan
+          return (
+            <li key={index} className="p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <FileText className="h-10 w-10 text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {file.name || 'İsimsiz dosya'}
+                    </p>
+                    <div className="flex items-center mt-1 text-xs text-gray-500">
+                      <HardDrive className="flex-shrink-0 mr-1.5 h-4 w-4" />
+                      <span>{formatFileSize(file.size)}</span>
+                      <span className="mx-2">•</span>
+                      <Calendar className="flex-shrink-0 mr-1.5 h-4 w-4" />
+                      <span>{formatDate(file.lastModified)}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onRemove(index)}
+                  className="flex-shrink-0 ml-4 bg-white rounded-full p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  <span className="sr-only">Dosyayı kaldır</span>
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
 
   // Admin yetkisini kontrol et ve admin değilse yönlendir
   if (!isAdmin) {
@@ -315,15 +415,28 @@ const AdminView = () => {
                         onChange={handleFileChange}
                         accept={fileType === 'xlsx' ? '.xlsx' : '.csv'}
                         disabled={isLoading || !fileType}
+                        multiple // Çoklu dosya seçimine izin ver
                       />
                     </label>
                     <p className="pl-1">veya sürükleyip bırakın</p>
                   </div>
                   <p className="text-xs text-gray-500">
-                    {fileType === 'xlsx' ? 'XLSX' : 'CSV'} dosyası (maksimum 10MB)
+                    {fileType === 'xlsx' ? 'XLSX' : 'CSV'} dosyaları (maksimum 10MB her biri)
                   </p>
                 </div>
               </div>
+
+              {/* Seçilen Dosyalar Listesi */}
+              {selectedFiles.length > 0 && (
+                <FileList
+                  files={selectedFiles}
+                  onRemove={(index) => {
+                    const newFiles = [...selectedFiles]
+                    newFiles.splice(index, 1)
+                    setSelectedFiles(newFiles)
+                  }}
+                />
+              )}
             </div>
 
             {/* Yükleme Türü Seçimi */}
@@ -356,7 +469,7 @@ const AdminView = () => {
             </div>
 
             {/* Başlık Eşleştirme */}
-            {excelHeaders.length > 0 && dbHeaders.length > 0 && (
+            {selectedFiles.length > 0 && selectedFiles[0].headers && dbHeaders.length > 0 && (
               <div>
                 <h2 className="text-lg font-medium text-gray-900 mb-4">Başlık Eşleştirme</h2>
                 <div className="grid grid-cols-2 gap-4">
@@ -375,9 +488,9 @@ const AdminView = () => {
                         onChange={(e) => handleMappingChange(e.target.value, dbHeader)}
                       >
                         <option value="">--Eşleştirme--</option>
-                        {excelHeaders.map((excelHeader, idx) => (
-                          <option key={idx} value={excelHeader}>
-                            {excelHeader} (Önerilen: {mapping[dbHeader]})
+                        {selectedFiles[0].headers.map((fileHeader, idx) => (
+                          <option key={idx} value={fileHeader}>
+                            {fileHeader} (Önerilen: {selectedFiles[0].initialMapping[dbHeader]})
                           </option>
                         ))}
                       </select>

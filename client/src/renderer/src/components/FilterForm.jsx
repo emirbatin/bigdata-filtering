@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate, Navigate } from 'react-router-dom'
 import {
   X,
   ChevronLeft,
@@ -11,23 +12,24 @@ import {
   LogOut
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import CustomButton from './CustomButton'
 import CustomIconButton from './CustomIconButton'
+import useAuth from '../hooks/useAuth'
+import { apiRequest } from '../utils/apiUtils'
 
 const FilterForm = () => {
+  const { isAdmin, isAuthenticated, logout, fetchUserData } = useAuth()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(30)
+  const [itemsPerPage] = useState(50)
   const [selectedDataType, setSelectedDataType] = useState('import')
-  const [selectedRows, setSelectedRows] = useState([]) // Seçilen satırların dizisi
-  const [lastSelectedRow, setLastSelectedRow] = useState(null) // Son tıklanan satır
+  const [selectedRows, setSelectedRows] = useState([]) 
+  const [lastSelectedRow, setLastSelectedRow] = useState(null)
   const [totalPages, setTotalPages] = useState(1)
   const [pageGroup, setPageGroup] = useState(0)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false) // Değiştirilen kısım
   const navigate = useNavigate()
   const [filters, setFilters] = useState({
     tcgbTescilNo: '',
@@ -46,17 +48,19 @@ const FilterForm = () => {
     gtipKodu: ''
   })
 
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />
+  }
+
   const handleRowClick = (index, event) => {
     if (event.shiftKey && lastSelectedRow !== null) {
       const start = Math.min(lastSelectedRow, index)
       const end = Math.max(lastSelectedRow, index)
       let newSelectedRows = [...selectedRows]
 
-      // Eğer tıklanan satır zaten seçiliyse, onu listeden çıkar
       if (newSelectedRows.includes(index)) {
         newSelectedRows = newSelectedRows.filter((row) => row !== index)
       } else {
-        // Değilse, aradaki tüm satırları seç
         for (let i = start; i <= end; i++) {
           if (!newSelectedRows.includes(i)) {
             newSelectedRows.push(i)
@@ -66,58 +70,14 @@ const FilterForm = () => {
 
       setSelectedRows(newSelectedRows)
     } else {
-      // Shift'e basılı değilse, sadece tıklanan satırı seç ve diğer seçimleri kaldır
       setSelectedRows([index])
     }
     setLastSelectedRow(index)
   }
 
-  const handleLogout = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/api/v1/user/logout', {
-        method: 'POST',
-        credentials: 'include'
-      })
-      if (response.ok) {
-        console.log('Başarıyla çıkış yaptınız.')
-        navigate('/')
-      } else {
-        console.log('Çıkış işlemi başarısız.')
-      }
-    } catch (error) {
-      console.log('Çıkış işlemi sırasında hata oluştu.')
-    }
+  const handleLogout = () => {
+    logout()
   }
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const token = localStorage.getItem('token')
-
-      if (!token) {
-        console.error('Token bulunamadı, kullanıcı doğrulanamıyor.')
-        return
-      }
-
-      try {
-        const response = await fetch('http://localhost:3000/api/v1/user/me', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        })
-
-        if (!response.ok) {
-          throw new Error('Kullanıcı verisi alınamadı')
-        }
-
-        const data = await response.json()
-        setIsAdmin(data.permission === 'admin') // Kullanıcının admin olup olmadığını kontrol ediyoruz
-      } catch (error) {
-        console.error('Kullanıcı verisi alınırken hata oluştu:', error)
-      }
-    }
-
-    fetchUserData()
-  }, [])
 
   const handleAdminClick = () => {
     navigate('/Admin')
@@ -145,29 +105,21 @@ const FilterForm = () => {
   const applyFilters = useCallback(async () => {
     setLoading(true)
 
-    console.log('Uygulanan filtreler:', filters)
-
     const query = new URLSearchParams({
       ...filters,
       page: currentPage,
       limit: itemsPerPage
     }).toString()
 
-    console.log('Oluşturulan sorgu stringi:', query)
-
     try {
-      const url = `http://localhost:3000/api/v1/commerce/${selectedDataType}?${query}`
-      console.log("İstek URL'si:", url)
-
-      const response = await fetch(url)
+      const url = `/api/v1/commerce/${selectedDataType}?${query}`
+      const response = await apiRequest(url)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
-      console.log('Backend yanıtı:', result)
-
       setData(result.data)
       setTotalPages(result.totalPages)
 
@@ -189,12 +141,17 @@ const FilterForm = () => {
         )
       }
     } catch (error) {
-      console.error('Veri çekme hatası:', error)
-      alert(`Veri çekilirken bir hata oluştu: ${error.message}`)
+      if (error.message === 'Unauthorized') {
+        alert('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.')
+        logout()
+      } else {
+        console.error('Veri çekme hatası:', error)
+        alert(`Veri çekilirken bir hata oluştu: ${error.message}`)
+      }
     } finally {
       setLoading(false)
     }
-  }, [filters, currentPage, itemsPerPage, selectedDataType])
+  }, [filters, currentPage, itemsPerPage, selectedDataType, logout])
 
   useEffect(() => {
     applyFilters()
@@ -255,6 +212,8 @@ const FilterForm = () => {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { duration: 0.5, delay: 0.2 } }
   }
+
+  // Return ifadesi buradan sonra gelecek...
 
   return (
     <motion.div
@@ -354,7 +313,7 @@ const FilterForm = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {data.slice(0, 20).map((item, index) => (
+                    {data.slice(0, 50).map((item, index) => (
                       <motion.tr
                         key={index}
                         className={`cursor-pointer ${

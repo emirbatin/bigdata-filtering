@@ -7,12 +7,10 @@ export const handleExcelFile = async (file, dbHeaders) => {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
   const worksheet = workbook.worksheets[0]
-
   const headers = []
   worksheet.getRow(1).eachCell((cell, colNumber) => {
     headers.push(cell.text)
   })
-
   const rows = []
   worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber > 1) {
@@ -23,7 +21,6 @@ export const handleExcelFile = async (file, dbHeaders) => {
       rows.push(rowData)
     }
   })
-
   const initialMapping = {}
   headers.forEach((header) => {
     const matchedHeader = matchHeader(header, dbHeaders)
@@ -31,7 +28,6 @@ export const handleExcelFile = async (file, dbHeaders) => {
       initialMapping[matchedHeader] = header
     }
   })
-
   return { headers, rows, initialMapping }
 }
 
@@ -45,7 +41,6 @@ export const handleCsvFile = async (file, dbHeaders) => {
       return acc
     }, {})
   )
-
   const initialMapping = {}
   headers.forEach((header) => {
     const matchedHeader = matchHeader(header, dbHeaders)
@@ -53,6 +48,5 @@ export const handleCsvFile = async (file, dbHeaders) => {
       initialMapping[matchedHeader] = header
     }
   })
-
   return { headers, csvData, initialMapping }
 }
