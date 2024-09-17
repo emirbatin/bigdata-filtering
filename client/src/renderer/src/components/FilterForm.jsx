@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   X,
   ChevronLeft,
@@ -23,6 +23,8 @@ import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 
 const FilterForm = () => {
+  const gridRef = useRef(null);
+
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
@@ -196,8 +198,15 @@ const FilterForm = () => {
   }, [])
 
   const handleDownload = useCallback(() => {
-    console.log('Veriler indiriliyor...')
-  }, [])
+    if (gridRef.current && gridRef.current.api) {
+      const params = {
+        fileName: `${selectedDataType === 'import' ? 'Ithalat' : 'Ihracat'}_Verileri.csv`,
+        suppressQuotes: true,
+        columnSeparator: ';'
+      };
+      gridRef.current.api.exportDataAsCsv(params);
+    }
+  }, [selectedDataType]);
 
   const containerVariants = {
     hidden: { opacity: 0, x: 50 },
@@ -271,6 +280,12 @@ const FilterForm = () => {
             className="bg-indigo-500 text-white hover:bg-indigo-600 py-2 px-4"
             icon={RefreshCw}
           />
+          <CustomButton
+            label="Verileri İndir"
+            onClick={handleDownload} // CSV indirme işlemi için handleDownload
+            className="bg-green-500 text-white hover:bg-green-600 py-2 px-4"
+            icon={Download}
+          />
         </motion.div>
 
         <motion.div
@@ -292,6 +307,7 @@ const FilterForm = () => {
             ) : (
               <motion.div className="ag-theme-alpine" style={{ height: '100vh', width: '100%' }}>
                 <AgGridReact
+                  ref={gridRef}
                   columnDefs={columnDefs}
                   rowData={data}
                   defaultColDef={{
