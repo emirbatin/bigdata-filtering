@@ -103,7 +103,7 @@ const AdminView = () => {
     setMessage('')
     setProgress(0)
 
-    // Her dosya için ön işleme yapalım
+    // Process each file
     const processedFiles = await Promise.all(
       files.map(async (file) => {
         try {
@@ -114,40 +114,30 @@ const AdminView = () => {
             result = await handleCsvFile(file, dbHeaders)
           }
           return {
-            file: {
-              name: file.name,
-              size: file.size,
-              lastModified: file.lastModified,
-              type: file.type
-            },
+            file, // Store the actual File object here
             ...result
           }
         } catch (error) {
           console.error(`Error processing file ${file.name}:`, error)
           return {
-            file: {
-              name: file.name,
-              size: file.size,
-              lastModified: file.lastModified,
-              type: file.type
-            },
+            file, // Still store the actual File object even if there's an error
             error: error.message
           }
         }
       })
     )
 
-    // Hata olmayan dosyaları filtreleyip state'e kaydedelim
+    // Filter out files that didn't have errors and set them in the state
     const validFiles = processedFiles.filter((file) => !file.error)
     setSelectedFiles(validFiles)
 
-    // İlk dosyanın başlıklarını ve eşleştirmelerini set edelim
+    // Set headers and mappings for the first valid file
     if (validFiles.length > 0) {
       setExcelHeaders(validFiles[0].headers)
       setMapping(validFiles[0].initialMapping)
     }
 
-    // Varsa hataları gösterelim
+    // Handle and display any errors
     const errors = processedFiles.filter((file) => file.error)
     if (errors.length > 0) {
       setMessage(`${errors.length} dosya işlenemedi. Lütfen dosyaları kontrol edin.`)
@@ -181,14 +171,30 @@ const AdminView = () => {
       return
     }
 
-    // Dosya yükleme mantığı burada devam ediyor...
+    setIsLoading(true)
+    setProgress(0)
+
+    console.log('Selected Files:', selectedFiles)
+
     for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex++) {
-      const file = selectedFiles[fileIndex].file
+      const fileObj = selectedFiles[fileIndex]
+      console.log('Processing file object:', fileObj)
+
+      const file = fileObj.file || fileObj // Try to get the File object
+
+      // Check if it's a valid file-like object
+      if (!file || typeof file.slice !== 'function') {
+        console.error('Invalid file object:', file)
+        setMessage(`${fileObj.name || 'Dosya'} geçerli bir dosya değil.`)
+        setIsLoading(false)
+        return
+      }
+
       const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
 
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE
-        const end = start + CHUNK_SIZE
+        const end = Math.min(start + CHUNK_SIZE, file.size)
         const chunk = file.slice(start, end)
 
         const formData = new FormData()
@@ -202,7 +208,7 @@ const AdminView = () => {
           const response = await fetch('http://localhost:3000/api/v1/data/upload-chunk', {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${token}` // Token burada ekleniyor
+              Authorization: `Bearer ${token}`
             },
             body: formData
           })
@@ -228,11 +234,11 @@ const AdminView = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}` // Token burada da ekleniyor
+            Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
             type: uploadType,
-            mapping: selectedFiles[fileIndex].initialMapping,
+            mapping: fileObj.initialMapping || mapping, // Use fileObj.initialMapping if available, otherwise fall back to the global mapping
             fileType,
             fileName: file.name
           })
@@ -268,7 +274,7 @@ const AdminView = () => {
 
   const handleDbHeaderChange = (value, index) => {
     const newDbHeaders = [...dbHeaders]
-    const camelCaseHeader = toCamelCase(value) // Yeni camelCase formatına çeviriyoruz
+    const camelCaseHeader = toCamelCase(value)
     newDbHeaders[index] = camelCaseHeader
     setDbHeaders(newDbHeaders)
   }
@@ -283,7 +289,7 @@ const AdminView = () => {
   }
 
   const handleGoBack = () => {
-    navigate('/FilterForm') // Ana sayfaya yönlendir (FilterForm'un bulunduğu sayfa)
+    navigate('/FilterForm')
   }
 
   const FileList = ({ files, onRemove }) => (
@@ -291,7 +297,7 @@ const AdminView = () => {
       <h3 className="text-lg font-semibold text-gray-800">Seçilen Dosyalar</h3>
       <ul className="bg-white rounded-lg shadow-md divide-y divide-gray-200">
         {files.map((fileObj, index) => {
-          const file = fileObj.file || fileObj // file özelliği yoksa doğrudan fileObj'yi kullan
+          const file = fileObj.file || fileObj
           return (
             <li key={index} className="p-4 hover:bg-gray-50 transition-colors">
               <div className="flex items-center justify-between">
@@ -327,7 +333,6 @@ const AdminView = () => {
     </div>
   )
 
-  // Admin yetkisini kontrol et ve admin değilse yönlendir
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -415,7 +420,7 @@ const AdminView = () => {
                         onChange={handleFileChange}
                         accept={fileType === 'xlsx' ? '.xlsx' : '.csv'}
                         disabled={isLoading || !fileType}
-                        multiple // Çoklu dosya seçimine izin ver
+                        multiple
                       />
                     </label>
                     <p className="pl-1">veya sürükleyip bırakın</p>

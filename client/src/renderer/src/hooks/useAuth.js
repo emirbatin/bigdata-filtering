@@ -6,33 +6,30 @@ export const useAuth = () => {
   const [alertInfo, setAlertInfo] = useState({ show: false, message: '', type: 'default' })
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const token = localStorage.getItem('token')
-
-      if (!token) {
-        console.error('Token bulunamadı, kullanıcı doğrulanamıyor.')
-        return
-      }
-
-      try {
-        const response = await fetch('http://localhost:3000/api/v1/user/me', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        })
-
-        if (!response.ok) {
-          throw new Error('Kullanıcı verisi alınamadı')
-        }
-
-        const data = await response.json()
-        setIsAdmin(data.permission === 'admin')
-      } catch (error) {
-        console.error('Kullanıcı verisi alınırken hata oluştu:', error)
-      }
+  const fetchUserData = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.error('Token bulunamadı, kullanıcı doğrulanamıyor.')
+      return
     }
 
+    try {
+      const response = await fetch('http://localhost:3000/api/v1/user/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (!response.ok) {
+        throw new Error('Kullanıcı verisi alınamadı')
+      }
+
+      const data = await response.json()
+      setIsAdmin(data.permission === 'admin')
+    } catch (error) {
+      console.error('Kullanıcı verisi alınırken hata oluştu:', error)
+    }
+  }
+
+  useEffect(() => {
     fetchUserData()
   }, [])
 
@@ -40,9 +37,7 @@ export const useAuth = () => {
     try {
       const response = await fetch('http://localhost:3000/api/v1/user/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       })
 
@@ -59,7 +54,7 @@ export const useAuth = () => {
         })
 
         setTimeout(() => {
-          navigate('/FilterForm') // Use navigate instead of window.location
+          navigate('/FilterForm')
         }, 2000)
 
         return true
@@ -84,13 +79,11 @@ export const useAuth = () => {
 
   const logout = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/v1/user/logout', {
-        method: 'POST',
-        credentials: 'include'
-      })
-
+      const response = await fetch('http://localhost:3000/api/v1/user/logout', { method: 'POST' })
       if (response.ok) {
         console.log('Başarıyla çıkış yaptınız.')
+        localStorage.removeItem('token') // Token ve yetki bilgilerini temizle
+        localStorage.removeItem('permission')
         navigate('/')
       } else {
         console.log('Çıkış işlemi başarısız.')
@@ -100,5 +93,5 @@ export const useAuth = () => {
     }
   }
 
-  return { isAdmin, login, logout, alertInfo }
+  return { isAdmin, login, logout, alertInfo, fetchUserData }
 }
