@@ -1,51 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 
 const RegisterView = () => {
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [gender, setGender] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [gender, setGender] = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const handleRegister = async (e) => {
-    e.preventDefault();
-  
+    e.preventDefault()
+
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
+      setError('Passwords do not match.')
+      return
     }
-  
+
     try {
-      const response = await fetch('http://localhost:3000/api/v1/user/register', {  // Updated to port 3000
+      const response = await fetch(`${API_URL}/api/v1/user/register`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ fullName, username, password, confirmPassword, gender }),
-        credentials: 'include',
-      });
-  
-      const data = await response.json();
-  
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+
       if (response.ok) {
-        setSuccess('User registered successfully!');
-        setFullName('');
-        setUsername('');
-        setPassword('');
-        setConfirmPassword('');
-        setGender('');
+        setSuccess('User registered successfully!')
+        setFullName('')
+        setUsername('')
+        setPassword('')
+        setConfirmPassword('')
+        setGender('')
       } else {
-        setError(data.message || 'Registration failed. Please try again.');
+        setError(data.message || 'Registration failed. Please try again.')
       }
     } catch (error) {
-      console.error('Error during registration:', error);
-      setError('Server error. Please try again later.');
+      console.error('Error during registration:', error)
+      setError('Server error. Please try again later.')
     }
-  };
-  
-  
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -119,7 +117,9 @@ const RegisterView = () => {
               className="mt-1 px-4 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
-              <option value="" disabled>Select gender</option>
+              <option value="" disabled>
+                Select gender
+              </option>
               <option value="male">Male</option>
               <option value="female">Female</option>
             </select>
@@ -135,7 +135,7 @@ const RegisterView = () => {
         </form>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default RegisterView;
+export default RegisterView

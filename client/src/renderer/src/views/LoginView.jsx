@@ -1,12 +1,21 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Alert, AlertTitle, AlertDescription } from '../components/Alert'
 import { CheckCircle, XCircle } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import { useAuthContext } from '../context/AuthContext'
 
 const LoginView = () => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const { login, alertInfo } = useAuth()
+  const { login, alertInfo, userData, isLoading } = useAuthContext()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    // Sadece userData yüklendiğinde ve isLoading false olduğunda yönlendir
+    if (!isLoading && userData) {
+      navigate(userData.permission === 'admin' ? '/Admin' : '/DataTable')
+    }
+  }, [userData, navigate, isLoading]) // isLoading'i de ekledik, böylece veriler yüklenirken yönlendirme yapılmaz
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -28,7 +37,7 @@ const LoginView = () => {
               name="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 px-4 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="mt-1 px-4 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               placeholder="Kullanıcı adınızı girin"
               required
             />
@@ -43,19 +52,20 @@ const LoginView = () => {
               name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 px-4 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="mt-1 px-4 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               placeholder="Şifrenizi girin"
               required
             />
           </div>
           <button
             type="submit"
-            className="w-full py-2 px-4 bg-blue-500 text-white font-semibold rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300"
+            className="w-full py-2 px-4 bg-orange-500 text-white font-semibold rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition duration-300"
+            disabled={isLoading}
           >
-            Giriş Yap
+            {isLoading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
           </button>
         </form>
-        <div className='mt-6'>
+        <div className="mt-6">
           {alertInfo.show && (
             <Alert variant={alertInfo.type} className="mb-4">
               {alertInfo.type === 'default' ? (

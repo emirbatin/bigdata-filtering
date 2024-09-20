@@ -7,7 +7,7 @@ const Button = React.memo(({ children, className, ...props }) => (
   <motion.button
     whileHover={{ scale: 1.05 }}
     whileTap={{ scale: 0.95 }}
-    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background ${className}`}
+    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background ${className}`}
     {...props}
   >
     {children}
@@ -18,7 +18,7 @@ const Input = React.memo(
   React.forwardRef(({ className, type, ...props }, ref) => (
     <input
       type={type}
-      className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ${className}`}
+      className={`flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ${className}`}
       ref={ref}
       {...props}
     />
@@ -38,7 +38,7 @@ const Label = React.memo(
 const Select = React.memo(({ children, className, ...props }) => (
   <div className="relative">
     <select
-      className={`flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none ${className}`}
+      className={`flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none ${className}`}
       {...props}
     >
       {children}
@@ -57,15 +57,19 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
       setFilters((prevFilters) => {
         const updatedFilters = { ...prevFilters, [name]: value }
 
-        if (name === 'menseUlkeKodu' || name === 'menseUlkeAdi') {
-          const matchedCountry = menseiUlkeData.find((item) =>
-            name === 'menseUlkeKodu'
-              ? item.code.toLowerCase().startsWith(value.toLowerCase())
-              : item.name.toLowerCase() === value.toLowerCase()
+        if (name === 'menseUlkeAdi') {
+          // Ülke adını seçtiğimizde ülke kodunu da ekliyoruz
+          const matchedCountry = menseiUlkeData.find(
+            (item) => item.name.trim().toLowerCase() === value.trim().toLowerCase()
           )
 
-          updatedFilters.menseUlkeKodu = matchedCountry ? matchedCountry.code : ''
-          updatedFilters.menseUlkeAdi = matchedCountry ? matchedCountry.name : ''
+          if (matchedCountry) {
+            updatedFilters.menseUlkeKodu = matchedCountry.code
+            updatedFilters.menseUlkeAdi = matchedCountry.name
+          } else {
+            updatedFilters.menseUlkeKodu = ''
+            updatedFilters.menseUlkeAdi = ''
+          }
         }
 
         return updatedFilters
@@ -97,11 +101,11 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
         initial={false}
         animate={{ x: isOpen ? '0%' : '100%' }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="fixed top-0 right-0 h-full w-80 bg-gradient-to-bl from-gray-900 to-gray-800 text-white overflow-hidden z-50 shadow-lg"
+        className="fixed top-0 right-0 h-full w-80 bg-gray-50 text-gray-900 overflow-hidden z-50 shadow-lg"
       >
-        <div className="flex items-center justify-between p-6 bg-gradient-to-l from-blue-600 to-blue-800">
-          <Filter className="text-white" />
-          <h2 className="text-2xl font-bold text-white">Filtre Ayarı</h2>
+        <div className="flex items-center justify-between p-6">
+          <Filter className="text-gray-900" />
+          <h2 className="text-2xl font-bold text-gray-900">Filtre Ayarı</h2>
         </div>
 
         <div className="p-6 space-y-6 overflow-y-auto h-[calc(100%-80px)] custom-scrollbar">
@@ -113,7 +117,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <Label htmlFor={item.name} className="text-sm font-medium text-gray-300">
+              <Label htmlFor={item.name} className="text-sm font-medium text-gray-600">
                 {item.label}
               </Label>
               <div className="relative">
@@ -124,7 +128,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
                   placeholder="Ara"
                   value={filters[item.name]}
                   onChange={(e) => handleInputChange(item.name, e.target.value)}
-                  className="bg-gray-700 text-white placeholder-gray-400 border-gray-600 focus:border-blue-500 focus:ring-blue-500"
+                  className="bg-white text-gray-900 placeholder-gray-500 border-gray-300 focus:border-blue-400 focus:ring-blue-400"
                 />
                 <Search
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -140,7 +144,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <Label htmlFor="menseUlkeAdi" className="text-sm font-medium text-gray-300">
+            <Label htmlFor="menseUlkeAdi" className="text-sm font-medium text-gray-600">
               Menşe Ülke Adı
             </Label>
             <Select
@@ -148,7 +152,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
               name="menseUlkeAdi"
               value={filters.menseUlkeAdi}
               onChange={(e) => handleInputChange('menseUlkeAdi', e.target.value)}
-              className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+              className="bg-white text-gray-900 border-gray-300 focus:border-blue-400"
             >
               <option value="">Ülke seçin</option>
               {menseiUlkeData.map((country) => (
@@ -167,7 +171,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.2 + index * 0.1 }}
             >
-              <Label htmlFor={item} className="text-sm font-medium text-gray-300">
+              <Label htmlFor={item} className="text-sm font-medium text-gray-600">
                 {item === 'tescilTarihi' ? 'TCGB Tescil Tarihi' : 'TCGB Kapanış Tarihi'}
               </Label>
               <DatePicker
@@ -175,7 +179,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
                 name={item}
                 value={filters[item]}
                 onChange={(e) => handleInputChange(item, e.target.value)}
-                className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+                className="bg-white text-gray-900 border-gray-300 focus:border-blue-400"
               />
             </motion.div>
           ))}
@@ -199,7 +203,7 @@ const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters }) =
         initial={false}
         animate={{ x: isOpen ? '320px' : '0' }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="fixed top-4 right-4 z-50" // left-4 yerine right-4
+        className="fixed top-4 right-4 z-50"
       ></motion.div>
     </div>
   )
