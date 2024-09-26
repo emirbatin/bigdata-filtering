@@ -29,7 +29,13 @@ const userModel = new mongoose.Schema(
       enum: ["admin", "user"],
       default: "user",
     },
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
   },
   { timestamps: true }
 );
+
 export const User = mongoose.model("User", userModel);

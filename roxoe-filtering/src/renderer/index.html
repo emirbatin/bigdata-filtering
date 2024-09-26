@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Roxoe - Veri Filtreleme</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' http://localhost:5173;
+    style-src 'self' 'unsafe-inline' http://localhost:5173;
+    img-src 'self' data: https://avatar.iran.liara.run;
+    connect-src 'self' http://localhost:3000 http://localhost:5000 ws://localhost:3000;
+    font-src 'self' data:;
+  "
+    />
+
+    <link rel="stylesheet" href="/src/styles/ag-grid.css" />
+    <link rel="stylesheet" href="/src/styles/ag-theme-alpine.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

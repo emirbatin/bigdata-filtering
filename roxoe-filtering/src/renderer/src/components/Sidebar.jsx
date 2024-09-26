@@ -1,0 +1,208 @@
+import React, { useCallback, useMemo } from 'react'
+import { Menu, X, Search, Filter, ChevronDown } from 'lucide-react'
+import menseiUlkeData from '../assets/menseulke.json'
+import { motion } from 'framer-motion'
+
+const Button = React.memo(({ children, className, ...props }) => (
+  <motion.button
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background ${className}`}
+    {...props}
+  >
+    {children}
+  </motion.button>
+))
+
+const Input = React.memo(
+  React.forwardRef(({ className, type, ...props }, ref) => (
+    <input
+      type={type}
+      className={`flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ${className}`}
+      ref={ref}
+      {...props}
+    />
+  ))
+)
+
+const Label = React.memo(
+  React.forwardRef(({ className, ...props }, ref) => (
+    <label
+      ref={ref}
+      className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className}`}
+      {...props}
+    />
+  ))
+)
+
+const Select = React.memo(({ children, className, ...props }) => (
+  <div className="relative">
+    <select
+      className={`flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none ${className}`}
+      {...props}
+    >
+      {children}
+    </select>
+    <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
+  </div>
+))
+
+const DatePicker = React.memo(({ className, ...props }) => (
+  <Input type="date" className={`${className}`} {...props} />
+))
+
+const Sidebar = ({ isOpen, toggleSidebar, filters, setFilters, applyFilters, isVisible = true }) => {
+  const handleInputChange = useCallback(
+    (name, value) => {
+      setFilters((prevFilters) => {
+        const updatedFilters = { ...prevFilters, [name]: value }
+
+        if (name === 'menseUlkeAdi') {
+          const matchedCountry = menseiUlkeData.find(
+            (item) => item.name.trim().toLowerCase() === value.trim().toLowerCase()
+          )
+
+          if (matchedCountry) {
+            updatedFilters.menseUlkeKodu = matchedCountry.code
+            updatedFilters.menseUlkeAdi = matchedCountry.name
+          } else {
+            updatedFilters.menseUlkeKodu = ''
+            updatedFilters.menseUlkeAdi = ''
+          }
+        }
+
+        return updatedFilters
+      })
+    },
+    [setFilters]
+  )
+
+  const isDateField = useCallback((fieldName) => {
+    return fieldName.toLowerCase().includes('tarih') || fieldName.toLowerCase().includes('date')
+  }, [])
+
+  const filterInputs = useMemo(
+    () => [
+      { label: 'TCGB Tescil No', name: 'tcgbTescilNo' },
+      { label: 'Gönderici / Alıcı Vergi No', name: 'vergiNo' },
+      { label: 'Gönderici Alıcı Adı', name: 'gondericiAliciAdi' },
+      { label: 'Alıcı Adı', name: 'aliciAdi' },
+      { label: 'Gönderen Adı', name: 'gonderenAdi' },
+      { label: 'Çıkış Ülkesi Kodu', name: 'cikisUlkeKodu' },
+      { label: 'Çıkış Ülkesi Adı', name: 'cikisUlkeAdi' },
+      { label: 'Menşe Ülke Kodu', name: 'menseUlkeKodu' },
+      { label: 'GTIP Kodu', name: 'gtipKodu' },
+      { label: 'Min Fatura Tutarı', name: 'minFaturaTutari', type: 'number' },
+      { label: 'Max Fatura Tutarı', name: 'maxFaturaTutari', type: 'number' },
+      { label: 'TCGB Tescil Tarihi', name: 'tescilTarihi', type: 'date' },
+      { label: 'TCGB Kapanış Tarihi', name: 'kapanisTarihi', type: 'date' }
+    ],
+    []
+  )
+
+  const renderFilterInput = useCallback((item) => {
+    if (isDateField(item.name)) {
+      return (
+        <DatePicker
+          id={item.name}
+          name={item.name}
+          value={filters[item.name]}
+          onChange={(e) => handleInputChange(item.name, e.target.value)}
+          className="bg-white text-gray-900 border-gray-300 focus:border-blue-400"
+        />
+      )
+    }
+
+    if (item.name === 'menseUlkeAdi') {
+      return (
+        <Select
+          id={item.name}
+          name={item.name}
+          value={filters[item.name]}
+          onChange={(e) => handleInputChange(item.name, e.target.value)}
+          className="bg-white text-gray-900 border-gray-300 focus:border-blue-400"
+        >
+          <option value="">Ülke seçin</option>
+          {menseiUlkeData.map((country) => (
+            <option key={country.code} value={country.name}>
+              {country.name}
+            </option>
+          ))}
+        </Select>
+      )
+    }
+
+    return (
+      <div className="relative">
+        <Input
+          id={item.name}
+          name={item.name}
+          type={item.type || 'text'}
+          placeholder="Ara"
+          value={filters[item.name]}
+          onChange={(e) => handleInputChange(item.name, e.target.value)}
+          className="bg-white text-gray-900 placeholder-gray-500 border-gray-300 focus:border-blue-400 focus:ring-blue-400"
+        />
+        <Search
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+          size={18}
+        />
+      </div>
+    )
+  }, [filters, handleInputChange, isDateField])
+
+  return (
+    <div className="relative">
+      <motion.div
+        initial={false}
+        animate={{ x: isOpen ? '0%' : '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="fixed top-0 right-0 h-full w-80 bg-gray-50 text-gray-900 overflow-hidden z-50 shadow-lg"
+      >
+        <div className="flex items-center justify-between p-6">
+          <Filter className="text-gray-900" />
+          <h2 className="text-2xl font-bold text-gray-900">Filtre Ayarı</h2>
+        </div>
+
+        <div className="p-6 space-y-6 overflow-y-auto h-[calc(100%-80px)] custom-scrollbar">
+          {filterInputs.map((item, index) => (
+            <motion.div
+              key={item.name}
+              className="space-y-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+            >
+              <Label htmlFor={item.name} className="text-sm font-medium text-gray-600">
+                {item.label}
+              </Label>
+              {renderFilterInput(item)}
+            </motion.div>
+          ))}
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+          >
+            <Button
+              onClick={applyFilters}
+              className="bg-blue-500 text-white hover:bg-blue-600 w-full py-2 mt-4"
+            >
+              Filtreleri Uygula
+            </Button>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={false}
+        animate={{ x: isOpen ? '320px' : '0' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="fixed top-4 right-4 z-50"
+      ></motion.div>
+    </div>
+  )
+}
+
+export default React.memo(Sidebar)

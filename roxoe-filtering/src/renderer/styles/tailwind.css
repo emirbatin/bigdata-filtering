@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AG Grid özel stilleri */
+.ag-theme-alpine {
+  --ag-header-height: 30px;
+  --ag-header-foreground-color: #000;
+  --ag-header-background-color: #f8f8f8;
+  --ag-header-cell-hover-background-color: #e6e6e6;
+  --ag-header-cell-moving-background-color: #c7c7c7;
+}
+
+.ag-root-wrapper {
+  border: none !important;
+}
+
+.ag-body-viewport-wrapper.ag-layout-normal {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.ag-body-horizontal-scroll-viewport {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.ag-body-horizontal-scroll {
+  height: 6px !important;
+}
+
+/* Scrollbar stilleri */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Electron-spesifik stiller */
+@media screen and (max-width: 1200px) {
+  .ag-body-viewport-wrapper.ag-layout-normal,
+  .ag-body-horizontal-scroll-viewport {
+    overflow: auto !important;
+  }
+}
