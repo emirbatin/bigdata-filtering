@@ -3,8 +3,6 @@
   "version": "1.0.0",
   "description": "An Electron application with React",
   "main": "./out/main/index.js",
-  "author": "https://www.codewithbatin.com",
-  "homepage": "https://www.roxoe.com.tr",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
@@ -13,11 +11,12 @@
     "build": "electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
+    "build:win": "npm run build && electron-builder --win --x64",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux"
   },
   "build": {
+    "asar": false,
     "appId": "com.roxoe.filtering",
     "productName": "Roxoe Filtering",
     "directories": {
@@ -25,16 +24,32 @@
       "buildResources": "resources"
     },
     "files": [
-      "dist/**/*",
+      {
+        "from": "out",
+        "to": "app/out",
+        "filter": [
+          "**/*"
+        ]
+      },
       "node_modules/**/*",
-      "package.json",
-      "main.js"
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "out",
+        "to": "app/out",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "publish": [
       {
         "provider": "github",
         "owner": "emirbatin",
-        "repo": "bigdata-filtering"
+        "repo": "bigdata-filtering",
+        "private": true,
+        "releaseType": "release"
       }
     ],
     "win": {
@@ -48,7 +63,8 @@
     "linux": {
       "target": "AppImage",
       "icon": "resources/icon.png"
-    }
+    },
+    "electronVersion": "31.6.0"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

@@ -1,11 +1,10 @@
 import axios from 'axios'
-
-const API_URL = 'http://localhost:3000/api/v1/user'
+import { API_URL } from '../main'
 
 // Login function
 export const login = async (username, password) => {
   try {
-    const response = await axios.post(`${API_URL}/login`, {
+    const response = await axios.post(`${API_URL}/api/v1/user/login`, {
       username,
       password
     })
@@ -58,7 +57,7 @@ export const checkTokenValidity = async () => {
   }
 
   try {
-    const response = await axios.get(`${API_URL}/check-token`, {
+    const response = await axios.get(`${API_URL}/api/v1/user/check-token`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -87,7 +86,9 @@ export const checkTokenValidity = async () => {
 export const refreshToken = async () => {
   try {
     const refreshToken = localStorage.getItem('refreshToken')
-    const response = await axios.post(`${API_URL}/refresh-token`, { token: refreshToken })
+    const response = await axios.post(`${API_URL}/api/v1/user/refresh-token`, {
+      token: refreshToken
+    })
     localStorage.setItem('token', response.data.token)
     localStorage.setItem('refreshToken', response.data.refreshToken)
     return { success: true, token: response.data.token }
@@ -102,7 +103,7 @@ export const refreshToken = async () => {
 export const getAllUsers = async () => {
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.get(`${API_URL}`, {
+    const response = await axios.get(`${API_URL}/api/v1/user`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -118,7 +119,7 @@ export const changePassword = async (oldPassword, newPassword) => {
   try {
     const token = localStorage.getItem('token')
     const response = await axios.post(
-      `${API_URL}/change-password`,
+      `${API_URL}/api/v1/user/change-password`,
       { oldPassword, newPassword },
       {
         headers: {
@@ -137,7 +138,7 @@ export const deactivateUser = async (userId) => {
   try {
     const token = localStorage.getItem('token')
     const response = await axios.put(
-      `${API_URL}/deactivate/${userId}`,
+      `${API_URL}/api/v1/user/deactivate/${userId}`,
       { status: 'inactive' },
       {
         headers: {
@@ -156,7 +157,7 @@ export const activateUser = async (userId) => {
   try {
     const token = localStorage.getItem('token')
     const response = await axios.put(
-      `${API_URL}/activate/${userId}`,
+      `${API_URL}/api/v1/user/activate/${userId}`,
       { status: 'active' },
       {
         headers: {
@@ -174,7 +175,7 @@ export const activateUser = async (userId) => {
 export const createUser = async (userData) => {
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.post(`${API_URL}/create`, userData, {
+    const response = await axios.post(`${API_URL}/api/v1/user/create`, userData, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -195,7 +196,7 @@ export const createUser = async (userData) => {
 export const editUser = async (userId, userData) => {
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.put(`${API_URL}/${userId}`, userData, {
+    const response = await axios.put(`${API_URL}/api/v1/user/${userId}`, userData, {
       headers: {
         Authorization: `Bearer ${token}`
       }

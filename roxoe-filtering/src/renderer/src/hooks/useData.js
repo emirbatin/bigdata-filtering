@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import moment from 'moment'
-
-const API_URL = 'http://localhost:3000'
+import { API_URL } from '../main'
 
 export const useData = (initialDataType) => {
   const [data, setData] = useState([])

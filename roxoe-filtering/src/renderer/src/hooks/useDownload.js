@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import axios from 'axios'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
+import { API_URL } from '../main'
 
 export const useDownload = (selectedDataType, filters) => {
   const [isDownloading, setIsDownloading] = useState(false)
@@ -27,7 +28,7 @@ export const useDownload = (selectedDataType, filters) => {
           page: currentPage
         }).toString()
         const initialResponse = await axios.get(
-          `http://localhost:3000/api/v1/commerce/${selectedDataType}?${initialQuery}`
+          `${API_URL}/api/v1/commerce/${selectedDataType}?${initialQuery}`
         )
 
         if (initialResponse?.data?.data) {
@@ -49,7 +50,7 @@ export const useDownload = (selectedDataType, filters) => {
             page: currentPage
           }).toString()
           const response = await axios.get(
-            `http://localhost:3000/api/v1/commerce/${selectedDataType}?${query}`
+            `${API_URL}/api/v1/commerce/${selectedDataType}?${query}`
           )
 
           if (response?.data?.data?.length > 0) {
