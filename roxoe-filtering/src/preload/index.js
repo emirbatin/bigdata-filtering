@@ -1,42 +1,65 @@
-// src/preload/index.js
+import { contextBridge, ipcRenderer } from 'electron';
+import { electronAPI } from '@electron-toolkit/preload';
 
-import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
+// Backend URL Ayarı (Geliştirme ve Üretim İçin)
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3000' 
+  : 'https://api.yourdomain.com';
 
 // Custom APIs for renderer
 const api = {
   send: (channel, data) => {
-    let validChannels = ['restart_app'] // İzin verilen kanallar
+    let validChannels = ['restart_app', 'custom_action'];
     if (validChannels.includes(channel)) {
-      ipcRenderer.send(channel, data)
+      ipcRenderer.send(channel, data);
+    } else {
+      console.warn(`Channel '${channel}' is not permitted.`);
     }
   },
   on: (channel, func) => {
-    let validChannels = ['update_available', 'update_downloaded'] // İzin verilen kanallar
+    let validChannels = ['update_available', 'update_downloaded', 'custom_event'];
     if (validChannels.includes(channel)) {
-      ipcRenderer.on(channel, (event, ...args) => func(...args))
+      ipcRenderer.on(channel, (event, ...args) => func(...args));
+    } else {
+      console.warn(`Channel '${channel}' is not permitted for listening.`);
     }
   },
   removeAllListeners: (channel) => {
-    ipcRenderer.removeAllListeners(channel)
+    let validChannels = ['update_available', 'update_downloaded'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeAllListeners(channel);
+    } else {
+      console.warn(`Channel '${channel}' is not permitted for removing listeners.`);
+    }
   }
-}
+};
 
-console.log('Preload script is loaded'); // Preload'ın yüklendiğini doğrulamak için log ekliyoruz
-
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api) // IPC fonksiyonlarını expose ediyoruz
-    console.log('contextBridge is used with context isolation enabled');
+    contextBridge.exposeInMainWorld('electron', electronAPI);
+    contextBridge.exposeInMainWorld('api', {
+      getApiUrl: () => API_URL,
+      send: api.send,
+      on: api.on,
+      removeAllListeners: api.removeAllListeners,
+    });
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('contextBridge is used with context isolation enabled');
+    }
   } catch (error) {
     console.error('Error exposing APIs with contextBridge:', error);
   }
 } else {
-  window.electron = electronAPI
-  window.api = api
-  console.log('contextBridge is not used, directly exposing APIs to window');
+  window.electron = electronAPI;
+  window.api = {
+    getApiUrl: () => API_URL,
+    send: api.send,
+    on: api.on,
+    removeAllListeners: api.removeAllListeners,
+  };
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('contextBridge is not used, directly exposing APIs to window');
+  }
 }

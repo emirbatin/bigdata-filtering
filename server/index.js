@@ -17,9 +17,25 @@ app.use(express.json({ limit: "50mb" }));
 
 // CORS ayarları
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:3000"],
+  origin: (origin, callback) => {
+    if (
+      !origin ||
+      ["http://localhost:5173", "http://localhost:3000"].includes(origin) ||
+      req.headers['x-electron-client'] === 'my-secure-electron-app'
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
 };
+app.use((req, res, next) => {
+  if (req.headers['x-electron-client'] === 'my-secure-electron-app') {
+    corsOptions.origin = true;
+  }
+  cors(corsOptions)(req, res, next);
+});
 
 app.use(cors(corsOptions));
 
