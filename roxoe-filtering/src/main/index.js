@@ -31,14 +31,16 @@ function createWindow() {
   })
 
   // Geliştirici araçlarını aç
-  mainWindow.webContents.openDevTools()
+ // mainWindow.webContents.openDevTools()
 
   // HMR for renderer based on electron-vite CLI.
   // Load the remote URL for development or the local html file for production.
   if (process.env.NODE_ENV === 'development' && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html')).catch((err) => {
+      console.error('Failed to load index.html:', err)
+    })
   }
 }
 
