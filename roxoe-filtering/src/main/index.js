@@ -1,6 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater' // Güncellemeleri kontrol etmek için eklendi
 import icon from '../../resources/icon.png?asset'
 
@@ -17,6 +16,7 @@ function createWindow() {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true, // Context isolation'ı etkinleştiriyoruz
       sandbox: false
     }
   })
@@ -30,9 +30,12 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // Geliştirici araçlarını aç
+  mainWindow.webContents.openDevTools()
+
   // HMR for renderer based on electron-vite CLI.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (process.env.NODE_ENV === 'development' && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))

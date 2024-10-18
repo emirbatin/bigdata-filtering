@@ -1,3 +1,8 @@
+/* @import ifadeleri en başta olmalıdır */
+@import '../../../node_modules/ag-grid-community/styles/ag-grid.css';
+@import '../../../node_modules/ag-grid-community/styles/ag-theme-alpine.css';
+
+/* Tailwind CSS Base, Components, Utilities */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
