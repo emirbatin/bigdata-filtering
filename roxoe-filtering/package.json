@@ -1,6 +1,6 @@
 {
   "name": "roxoe-filtering",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Veri filtreleme ve işleme",
   "main": "./out/main/index.js",
   "scripts": {
